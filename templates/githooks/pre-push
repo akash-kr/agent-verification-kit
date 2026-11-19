@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Every push: not behind upstream, real-app proof for this commit, the full suite, then the law,
+# red-first and seal checks.
+exec python3 "$(git rev-parse --show-toplevel)/scripts/agent-check" push --hook

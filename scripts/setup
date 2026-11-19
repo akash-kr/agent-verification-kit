@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""setup: one command to put the Agent Verification Kit into a repo, and later to check its health.
+
+  setup [repo-dir] [--github] [--commit-evidence] [--check]
+
+It copies the kit's files (never over one that exists), reads the repo to see what it can verify,
+fills in agent-check.toml where it can tell, and lists each tool that is missing with the command
+that installs it. It installs one only after you type y, never asks for a key, and stores none.
+--check changes nothing: it prints the same report.  --commit-evidence keeps the evidence folder in
+git (default: outside git, in .gitignore).
+"""
+from __future__ import annotations
+
+import json
+import platform
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+KIT = Path(__file__).resolve().parent.parent
+
+
+def tracked(repo: Path) -> list[str]:
+    return [n for n in subprocess.run(["git", "ls-files", "-z"], cwd=repo, capture_output=True, text=True).stdout.split("\0") if n]
+
+
+def detect(repo: Path, files: list[str]) -> dict:
+    """What the repo is, from its files only. Anything it cannot tell is left for the owner."""
+    found: dict = {"suite": None, "one_test": None, "serve": None, "tests": None, "notes": []}
+    has = lambda name: (repo / name).is_file()
+    package = json.loads((repo / "package.json").read_text()) if has("package.json") else {}
+    scripts = package.get("scripts", {})
+    if has("pyproject.toml") or has("pytest.ini") or has("setup.py") or any(f.endswith(".py") for f in files):
+        found["suite"], found["one_test"] = "python -m pytest -q", "python -m pytest -q -p no:cacheprovider {file}::{name}"
+    elif "test" in scripts:
+        found["suite"] = "npm test"
+    elif has("go.mod"):
+        found["suite"] = "go test ./..."
+    elif has("Cargo.toml"):
+        found["suite"] = "cargo test"
+    if found["suite"] and not found["one_test"]:
+        found["notes"].append("finding new tests, sealing them and the red-first check read Python test files only; every other check works here.")
+    found["tests"] = next((d + "/" for d in ("tests", "test", "spec", "__tests__") if any(f.startswith(d + "/") for f in files)), None)
+    found["serve"] = next((f"npm run {s}" for s in ("dev", "start") if s in scripts), None)
+    roots = {f.split("/")[0] for f in files if f.endswith(("package.json", "pyproject.toml", "go.mod", "Cargo.toml")) and "/" in f}
+    if len(roots) > 1:
+        found["notes"].append(f"several packages ({', '.join(sorted(roots))}): the config holds one test command, so point it at a script that runs them all.")
+    sys.path.insert(0, str(KIT / "scripts"))
+    from importlib.machinery import SourceFileLoader
+    surfaces = SourceFileLoader("evidence", str(KIT / "scripts" / "evidence")).load_module().SURFACES
+    seen = {next(s for s, (_, pattern) in surfaces.items() if re.search(pattern, f)) for f in files}
+    found["surfaces"] = sorted(seen - {"logic", "docs", "tests"}) + ["logic"]
+    return found
+
+
+def tools(found: dict) -> list[tuple[str, bool, str, str]]:
+    """(tool, present, what it is for, install command) for this machine."""
+    mac, linux = platform.system() == "Darwin", platform.system() == "Linux"
+    pkg = "brew install {}" if mac and shutil.which("brew") else "sudo apt-get install -y {}" if linux and shutil.which("apt-get") else ""
+    browser = bool(shutil.which("agent-browser")) or any((Path.cwd() / "node_modules" / p).exists() for p in ("playwright", "@playwright/test"))
+    agent = next((a for a in ("claude", "codex", "gemini") if shutil.which(a)), None)
+    rows = [("curl", bool(shutil.which("curl")), "API evidence and the verify check", pkg.format("curl"))]
+    if "ui" in found["surfaces"]:
+        rows += [("a browser tool (agent-browser or Playwright)", browser, "UI evidence: recording, screenshots, console errors",
+                  "npm install -g agent-browser" if shutil.which("npm") else ""),
+                 ("ffmpeg", bool(shutil.which("ffmpeg")), "recording, and stitching screenshots into a clip", pkg.format("ffmpeg"))]
+    rows.append((f"an agent CLI for the independent verifier ({agent or 'claude, codex or gemini'})", bool(agent),
+                 "high-severity evidence is recorded by an agent other than the author", ""))
+    return rows
+
+
+def fill_config(repo: Path, found: dict, commit_evidence: bool):
+    path = repo / "agent-check.toml"
+    text = path.read_text()
+    template = (KIT / "templates" / "agent-check.toml").read_text()
+    if text == template:  # still the template: fill in what the repo shows; an edited file is the owner's
+        if found["suite"]:
+            text = text.replace('test = "python -m pytest -q"', f'test = "{found["suite"]}"')
+        if found["suite"] and not found["one_test"]:
+            text = text.replace('one_test = "python -m pytest', '# one_test = "python -m pytest')
+        if found["tests"]:
+            text = text.replace('tests = "tests/"', f'tests = "{found["tests"]}"')
+        if found["serve"]:
+            text = text.replace('# serve = "./run-dev.sh"', f'# serve = "{found["serve"]}"   # uncomment once it listens on $PORT')
+        path.write_text(text)
+    ignore = repo / ".gitignore"
+    lines = ignore.read_text().splitlines() if ignore.exists() else []
+    if not commit_evidence and "evidence/" not in lines:
+        ignore.write_text("\n".join(lines + ["evidence/"]) + "\n")
+        print("added    evidence/ to .gitignore (pass --commit-evidence to keep it in git)")
+
+
+def main(argv: list[str]) -> int:
+    flags = {a for a in argv if a.startswith("--")}
+    if flags - {"--github", "--commit-evidence", "--check"}:
+        print(__doc__)
+        return 2
+    target = next((a for a in argv if not a.startswith("--")), ".")
+    top = subprocess.run(["git", "-C", target, "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+    if top.returncode != 0:
+        print(f"setup: {target} is not in a git repo (run `git init` first).", file=sys.stderr)
+        return 1
+    repo = Path(top.stdout.strip())
+    if "--check" not in flags:
+        done = subprocess.run(["bash", str(KIT / "scripts" / "install.sh"), str(repo), *(["--github"] if "--github" in flags else [])])
+        if done.returncode != 0:
+            return done.returncode
+    found = detect(repo, tracked(repo))
+    if "--check" not in flags and (repo / "agent-check.toml").exists():
+        fill_config(repo, found, "--commit-evidence" in flags)
+
+    print(f"\nWhat this repo can show as evidence: {', '.join(found['surfaces'])}")
+    print(f"  suite:      {found['suite'] or 'not found: set test in agent-check.toml'}")
+    print(f"  one test:   {found['one_test'] or 'not set: the red-first and seal checks stay off until one_test is set'}")
+    print(f"  starts app: {(found['serve'] + ' (suggested in agent-check.toml: it must listen on $PORT)') if found['serve'] else 'not found: set [evidence] serve to use $EVIDENCE_URL in cases'}")
+    for note in found["notes"]:
+        print(f"  note:       {note}")
+    print("\nTools:")
+    missing = 0
+    for name, present, why, install in tools(found):
+        print(f"  {'ok     ' if present else 'MISSING'}  {name}: {why}")
+        if present:
+            continue
+        missing += 1
+        if not install:
+            print("           install it by hand: no install command is known for this machine")
+        elif "--check" in flags or not sys.stdin.isatty():
+            print(f"           to install: {install}")
+        elif input(f"           install now with `{install}`? [y/N] ").strip().lower() == "y":
+            missing -= subprocess.run(install, shell=True).returncode == 0
+    print("\nNext: scripts/evidence start, then scripts/evidence run --case \"...\" -- <the real command>, then scripts/evidence finish."
+          "\n      scripts/evidence --help lists every option; docs/VERIFICATION.md is the page to paste into your agent rules.")
+    return 1 if "--check" in flags and missing else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Every commit: credentials, stray untracked files, a LAWS.md change shown, and the questions this diff triggers.
+exec python3 "$(git rev-parse --show-toplevel)/scripts/agent-check" commit

@@ -1,0 +1,626 @@
+#!/usr/bin/env python3
+"""agent-check: the git-level gate every coding agent (and every human) passes through.
+
+  agent-check commit        pre-commit: no credential in the staged diff, no untracked file left
+                            beside a staged one, a loud note when LAWS.md changes, and the questions
+                            (agent-check.toml [[question]]) whose paths this commit touches.
+  agent-check commit-msg <file>
+                            commit-msg: the "Verified:" trailer gate (gates.verified; off by default).
+  agent-check push          pre-push: fetched and not behind upstream; then, in a repo with
+                            agent-check.toml, nothing uncommitted, the full suite passes, every new
+                            test names a law or bug in LAWS.md, a new test fails on the old code
+                            (unless it holds a law added in this push), a test for a law or bug added
+                            in this push is sealed, each pushed commit has a "Verified:" trailer (gates.verified), and every
+                            changed assertion is listed. A new branch starts from the remote's default
+                            branch; only a push to a remote with no branches runs the suite alone.
+  agent-check push --hook   the same, from git's pre-push hook, reading what is pushed on stdin.
+  agent-check push --base <commit> [--no-suite] [--config-from <commit>]
+                            CI: check the commits after <commit> without fetching; --no-suite when
+                            the workflow already ran the suite; --config-from reads agent-check.toml
+                            from that commit (the base), so a change cannot loosen its own gate.
+  agent-check law "<text>"  append the next L<n> line to LAWS.md (the owner runs or approves this).
+  agent-check bug "<text>"  append the next B<n> line.
+  agent-check seal <file>::<test> [...]
+                            record a fingerprint of each test function in .sealed-tests (the owner
+                            runs or approves this); a push whose sealed test no longer matches is refused.
+  agent-check audit [--days N]
+                            the pruning report: laws nothing holds, "held by" references to tests that
+                            are gone, tags naming no law, a count of untagged tests, seals for missing
+                            tests, questions whose paths match no file, unverified commits.
+
+agent-check.toml (repo root): test = "<full suite>", one_test = "<one test, with {file} and {name}, which arrive shell-quoted>",
+tests = "<path prefix of test files>". one_test exits as pytest does: 1 when the test fails, another
+non-zero code when it cannot run it. Without it only the commit checks and the stale-push check run.
+Optional:
+  fresh = [globs]     a push (not CI, not docs-only, not a branch delete) is refused unless each glob
+                      matches a proof file whose first two lines are this HEAD's SHA and "clean", and
+                      whose remaining "<sha256>  <path>" lines still match those files.
+  review = [prefixes] a commit staging one prints "fresh review suggested".
+  seal_support = [prefixes]  fixtures and helpers sealed tests use; a push changing one warns.
+  [[question]] paths = [prefixes], ask = "<question>"  printed at commit when a staged path matches.
+  [gates] <gate> = "off" | "observe" | "enforce"  for fresh, laws, red_first, seals, verified, evidence.
+                      observe prints what it would refuse and logs it to .git/agent-check-observe.log.
+                      Default: enforce, except verified and evidence (off).
+                      evidence: a push whose severity owes evidence needs a passing evidence folder
+                      for this commit (scripts/evidence --help).
+Test discovery, seals and the red-first check read Python test files (3.12 or newer); the rest is
+language-neutral.
+"""
+from __future__ import annotations
+
+import ast
+import glob
+import hashlib
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import tomllib
+from pathlib import Path
+
+SECRET = re.compile(
+    r"AKIA[0-9A-Z]{16}|\bsk-(?:ant-|proj-|live_)?[A-Za-z0-9_-]{20,}|\bsk_live_[A-Za-z0-9]{16,}"
+    r"|\bgh[pousr]_[A-Za-z0-9]{30,}|\bxox[abpr]-[A-Za-z0-9-]{10,}"
+    r"|-----BEGIN (?:RSA |EC |OPENSSH |PGP |DSA )?PRIVATE KEY|\bAIza[0-9A-Za-z_-]{35}\b"
+    r"|\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}"
+    r"|(?:api[_-]?key|secret|token|password|passwd)\s*[:=]\s*['\"][A-Za-z0-9_\-/+=]{16,}['\"]",
+    re.I,
+)
+SECRET_ALLOWED = re.compile(r"example|placeholder|<[a-z_ -]+>|process\.env|os\.environ|\$\{|\$[A-Z_]+|xxx|your[_-]|redacted", re.I)
+TAG = re.compile(r"\[([LB]\d+)\]")
+LAW_LINE = re.compile(r"^([LB])(\d+):", re.M)
+HELD_REF = re.compile(r"([\w./-]+\.py)::([\w:]+)")
+VERIFIED = re.compile(r"^Verified:[ \t]*(.*)$", re.M | re.I)
+LAWS = "LAWS.md"
+SEALS = ".sealed-tests"
+MODES = {"off", "observe", "enforce"}
+DEFAULT_MODE = {"fresh": "enforce", "laws": "enforce", "red_first": "enforce", "seals": "enforce", "verified": "off", "evidence": "off"}
+
+
+def git(*args: str, cwd: str | Path = ".", check: bool = True) -> str:
+    # The checks parse git's output, so pin the settings that change its shape.
+    pinned = ["-c", "core.hooksPath=/dev/null", "-c", "color.ui=never", "-c", "core.quotePath=false",
+              "-c", "diff.noprefix=false", "-c", "diff.mnemonicPrefix=false", "-c", "diff.relative=false"]
+    run = subprocess.run(["git", *pinned, *args], cwd=cwd, capture_output=True, text=True)
+    if check and run.returncode != 0:
+        raise SystemExit(f"agent-check: git {' '.join(args)} failed: {run.stderr.strip()}")
+    return run.stdout
+
+
+def refuse(problems: list[str]) -> int:
+    print("agent-check refused:\n- " + "\n- ".join(problems), file=sys.stderr)
+    return 1
+
+
+def root() -> Path:
+    return Path(git("rev-parse", "--show-toplevel").strip())
+
+
+def config(rev: str | None = None) -> dict:
+    """agent-check.toml from disk, or from a commit (CI reads the base's, which the change cannot edit)."""
+    if rev:
+        if subprocess.run(["git", "rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"], capture_output=True).returncode != 0:
+            raise SystemExit(f"agent-check: cannot read agent-check.toml from {rev}: no such commit here (a shallow clone? fetch-depth: 0).")
+        text = git("show", f"{rev}:agent-check.toml", check=False)  # a base before the file existed has none
+    else:
+        path = root() / "agent-check.toml"
+        text = path.read_text() if path.exists() else ""
+    cfg = tomllib.loads(text) if text else {}
+    for gate, mode in cfg.get("gates", {}).items():
+        if gate not in DEFAULT_MODE or mode not in MODES:
+            raise SystemExit(f"agent-check: agent-check.toml [gates] {gate} = {mode!r}: gates are {', '.join(DEFAULT_MODE)}; modes are off, observe, enforce.")
+    questions = cfg.get("question", [])
+    for q in questions if isinstance(questions, list) else [questions]:
+        if not (isinstance(questions, list) and isinstance(q, dict) and isinstance(q.get("ask"), str)
+                and isinstance(q.get("paths"), list) and all(isinstance(p, str) for p in q["paths"])):
+            raise SystemExit(f"agent-check: agent-check.toml [[question]] {q}: each needs paths = [...] and ask = \"...\".")
+    return cfg
+
+
+def names(*args: str) -> list[str]:
+    """File names from git, NUL-separated so a space in a path stays in it."""
+    return [n for n in git(args[0], "-z", *args[1:]).split("\0") if n]
+
+
+# The messages git writes itself: an autosquash commit, or `git revert`'s subject and first body line.
+EXEMPT = re.compile(r'\A\s*(?:(?:fixup|squash|amend)! |Revert "[^\n]*"\n\nThis reverts commit [0-9a-f]{7,40})')
+
+
+def trailer_problem(body: str) -> str | None:
+    """What is wrong with a message's "Verified:" trailer, or None when it says how the commit was checked."""
+    found = VERIFIED.findall(body)
+    if found and found[-1].strip():
+        if re.fullmatch(r"none\W*", found[-1].strip(), re.I):
+            return 'the "Verified: none" trailer gives no reason: write "Verified: none, <why it was not run>".'
+        return None
+    return 'no "Verified:" trailer: say how this commit was checked, e.g. git commit --trailer "Verified: <command and result>", or "Verified: none, <why>".'
+
+
+def mode(cfg: dict, gate: str) -> str:
+    return cfg.get("gates", {}).get(gate, DEFAULT_MODE[gate])
+
+
+def finish(cfg: dict, found: list[tuple[str, str]], hard: list[str] | None = None) -> int:
+    """Refuse on enforced findings; print and log observed ones; drop the ones whose gate is off."""
+    hard = list(hard or [])
+    observed = []
+    for gate, msg in found:
+        m = mode(cfg, gate)
+        if m == "enforce":
+            hard.append(msg)
+        elif m == "observe":
+            observed.append(f"[{gate}] {msg}")
+    if observed:
+        print("agent-check observe mode, would refuse (not blocking):\n- " + "\n- ".join(observed), file=sys.stderr)
+        log = Path(git("rev-parse", "--git-path", "agent-check-observe.log").strip())
+        head = git("rev-parse", "--short", "HEAD", check=False).strip() or "-"
+        with log.open("a") as f:
+            f.writelines(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} {head} {o}\n" for o in observed)
+    return refuse(hard) if hard else 0
+
+
+def commit() -> int:
+    problems = []
+    diff = git("diff", "--cached", "-U0")
+    path = "?"
+    for line in diff.splitlines():
+        if line.startswith("+++ "):
+            path = (line[6:] if line.startswith("+++ b/") else line[4:]).rstrip("\t")
+        elif line.startswith("+") and SECRET.search(line) and not SECRET_ALLOWED.search(line + path):
+            problems.append(f"{path}: looks like a credential: {line[1:].strip()[:60]}")
+    staged = names("diff", "--cached", "--name-only")
+    dirs = {os.path.dirname(p) for p in staged}
+    untracked = names("ls-files", "--others", "--exclude-standard")
+    for file in untracked:
+        if os.path.dirname(file) in dirs:
+            problems.append(f"{file}: untracked, beside files this commit stages. Add it, delete it or ignore it.")
+    if LAWS in staged:
+        print(f"agent-check: this commit changes {LAWS}. Only the owner changes laws:\n{git('diff', '--cached', '--', LAWS)}", file=sys.stderr)
+    cfg = config()
+    review = [f for f in staged if any(f.startswith(p) for p in cfg.get("review", []))]
+    if review:  # at commit, so the review can happen before the push ships it
+        print("agent-check: fresh review suggested before you push, high-stakes files:\n  " + "\n  ".join(review), file=sys.stderr)
+    asks = [q["ask"] for q in cfg.get("question", []) if any(f.startswith(p) for f in staged for p in q.get("paths", []))]
+    if asks:  # only the questions this diff triggers, so each one gets read
+        print("agent-check: answer before you push (no check fully sees these):\n  - " + "\n  - ".join(asks), file=sys.stderr)
+    return refuse(problems) if problems else 0
+
+
+def commit_msg(path: str) -> int:
+    """gates.verified: each commit says how it was verified, in a "Verified:" trailer; "none" needs a reason.
+    The trailer is the author's claim, not proof; it makes unverified commits searchable."""
+    cfg = config()
+    m = mode(cfg, "verified")
+    if m == "off":
+        return 0
+    body = "\n".join(line for line in Path(path).read_text().splitlines() if not line.startswith("#"))
+    if not body.strip():
+        return 0  # an emptied message: let git abort the commit
+    if Path(git("rev-parse", "--git-path", "MERGE_HEAD").strip()).exists() or EXEMPT.search(body):
+        return 0
+    problem = trailer_problem(body)
+    if problem is None:
+        return 0
+    if m == "observe" and not VERIFIED.search(body):  # stamp it, so `git log` can find the commits nobody verified
+        subprocess.run(["git", "interpret-trailers", "--in-place", "--trailer", "Verified: none", path], check=True)
+    return finish(cfg, [("verified", problem)])
+
+
+def pushed() -> list[list[str]]:
+    """What git's pre-push hook passes on stdin (only with --hook): local ref, local sha, remote ref, remote sha."""
+    return [line.split() for line in sys.stdin.read().splitlines() if len(line.split()) == 4]
+
+
+def proof_holds(path: str, head: str) -> bool:
+    """A proof file names this commit and a clean tree, and every screenshot it hashes is unchanged."""
+    p = Path(path)
+    if not p.is_file():
+        return False
+    lines = p.read_text().splitlines()
+    if lines[:2] != [head, "clean"] or len(lines) < 3:  # a proof with no screenshot hashes proves nothing
+        return False
+    for line in lines[2:]:
+        digest, _, shot = line.partition("  ")
+        if not Path(shot).is_file() or hashlib.sha256(Path(shot).read_bytes()).hexdigest() != digest:
+            return False
+    return True
+
+
+def upstream_base() -> str | None:
+    """Where this push starts: the merge base with upstream, or None on a first push (nothing upstream)."""
+    git("fetch", "--quiet")
+    up = subprocess.run(["git", "rev-parse", "--abbrev-ref", "@{upstream}"], capture_output=True, text=True)
+    if up.returncode != 0:  # a new branch: it starts from the remote's default branch
+        remotes = git("remote").split()
+        remote = "origin" if "origin" in remotes else remotes[0] if len(remotes) == 1 else None
+        if remote is None:
+            raise SystemExit("agent-check refused:\n- no upstream and no single remote to compare with: set one with `git branch --set-upstream-to=<remote>/<branch>`, then push.")
+        ref = git("symbolic-ref", "--short", f"refs/remotes/{remote}/HEAD", check=False).strip()
+        if not ref:
+            if not git("ls-remote", "--heads", remote).strip():  # fails loudly if the remote cannot be read
+                return None  # the remote has no branches at all: a true first push
+            m = re.search(r"^ref: refs/heads/(\S+)\tHEAD", git("ls-remote", "--symref", remote, "HEAD"), re.M)
+            ref = f"{remote}/{m.group(1)}" if m else ""
+        if not ref or subprocess.run(["git", "rev-parse", "--verify", "--quiet", ref], capture_output=True).returncode != 0:
+            raise SystemExit(f"agent-check refused:\n- cannot tell which branch this push starts from: run `git remote set-head {remote} <default branch>`, then push.")
+        return git("merge-base", ref, "HEAD").strip()  # behind the default branch is normal for a new branch
+    ref = up.stdout.strip()
+    if subprocess.run(["git", "merge-base", "--is-ancestor", ref, "HEAD"]).returncode != 0:
+        raise SystemExit(f"agent-check refused:\n- HEAD is behind {ref}: another session pushed. Rebase onto it, re-run the checks, then push.")
+    return git("merge-base", ref, "HEAD").strip()
+
+
+def ids(text: str) -> set[str]:
+    return {k + n for k, n in LAW_LINE.findall(text)}
+
+
+def show(rev: str, path: str) -> str:
+    return git("show", f"{rev}:{path}", check=False)
+
+
+def functions(source: str) -> list[tuple[str, ast.AST]]:
+    """Every function in a file, in file order, named `f` or `Class::f`: in a `Test` class or one with a
+    base (unittest's), and under any `if`, `try` or `with`, but not inside another function."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+
+    def walk(node: ast.AST, prefix: str):
+        for n in ast.iter_child_nodes(node):
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                yield prefix + n.name, n
+            elif isinstance(n, ast.ClassDef):
+                if n.name.startswith("Test") or n.bases:
+                    yield from walk(n, f"{prefix}{n.name}::")
+            elif isinstance(n, (ast.stmt, ast.excepthandler)):
+                yield from walk(n, prefix)
+    return list(walk(tree, ""))
+
+
+def test_names(source: str) -> set[str]:
+    """The tests in a file: its functions named `test…`, as pytest collects them by default."""
+    return {name for name, _ in functions(source) if name.rpartition("::")[2].startswith("test")}
+
+
+def seals(text: str) -> dict[str, str]:
+    """`<sha256>  <file>::<test>` lines as {"file::test": sha256}."""
+    return {ref: digest for digest, _, ref in (line.partition("  ") for line in text.splitlines()) if ref}
+
+
+def test_source(source: str, name: str) -> str:
+    """A test's source, decorators included, found by the parser (`test` or `Class::test`); the last
+    definition wins, as it does when Python runs the file."""
+    source = source.replace("\r\n", "\n").replace("\r", "\n")  # the parser's own line breaks
+    fns = [n for found, n in functions(source) if found == name]
+    if not fns:
+        return ""
+    fn = fns[-1]
+    start = min([fn.lineno] + [d.lineno for d in fn.decorator_list]) - 1
+    return "\n".join(source.split("\n")[start:fn.end_lineno])
+
+
+def fingerprint(source: str, name: str) -> str:
+    """Its parsed shape with its decorators: reformatting or a comment keeps a seal; a changed value,
+    a moved block or a new marker does not."""
+    def shape(n):  # not ast.dump: its text changes between Python versions, and a seal must not
+        if isinstance(n, ast.AST):
+            return [type(n).__name__, [(f, shape(v)) for f, v in ast.iter_fields(n) if v is not None and v != []]]
+        return [shape(v) for v in n] if isinstance(n, list) else repr(n)
+    node = next((n for found, n in functions(source) if found == name), None)
+    return hashlib.sha256(repr(shape(node)).encode()).hexdigest() if node is not None else ""
+
+
+def words(line: str) -> str:
+    """A law line as words only: a changed space or full stop is not a changed law."""
+    return " ".join(re.findall(r"\w+", line.lower()))
+
+
+def seal(refs: list[str]) -> int:
+    top = root()
+    path = top / SEALS
+    current = seals(path.read_text()) if path.exists() else {}
+    for ref in refs:
+        file, _, name = ref.partition("::")
+        source = (top / file).read_text() if (top / file).is_file() else ""
+        digest = fingerprint(source, name)
+        if not digest:
+            return refuse([f"{ref}: no such test function to seal."])
+        if not TAG.findall(test_source(source, name)):
+            return refuse([f"{ref}: names no law or bug ([L<n>] or [B<n>]); only a law's test is sealed."])
+        current[ref] = digest
+        print(f"sealed {ref}")
+    path.write_text("".join(f"{d}  {r}\n" for r, d in sorted(current.items())))
+    return 0
+
+
+def push(base: str | None = None, suite: bool = True, hook: bool = False, config_from: str | None = None) -> int:
+    head = git("rev-parse", "HEAD").strip()
+    if hook:  # look at what is really being pushed; tags are not code to check
+        branches = [r for r in pushed() if r[2].startswith("refs/heads/")]
+        sent = {r[1] for r in branches} - {"0" * 40}
+        if not sent:
+            return 0  # only tags or branch deletions
+        if sent - {head}:
+            return refuse([f"this push sends {', '.join(s[:8] for s in sent - {head})}, but the checks run only on the checked-out commit {head[:8]}: check out what you push, then push it."])
+    local = base is None  # CI names its base
+    base = git("rev-parse", "--verify", f"{base}^{{commit}}").strip() if base else upstream_base()
+    cfg = config(config_from) if config_from else {}
+    cfg = cfg or config()  # a first commit has no base config to read
+    if not cfg:
+        return 0
+    if base is None:  # nothing upstream to compare with: the suite is all a first push can show
+        print("agent-check: first push (no upstream branch yet): only the suite runs; every other check starts with the next push.", file=sys.stderr)
+        if suite and subprocess.run(cfg["test"], shell=True, cwd=root()).returncode != 0:
+            return refuse(["the full suite failed on HEAD"])
+        return 0
+    top, prefix = root(), cfg.get("tests", "tests/")
+    found: list[tuple[str, str]] = []
+    touched = names("diff", "--name-only", f"{base}..HEAD")
+
+    docs_only = touched and all(f.endswith(".md") or f.startswith("docs/") for f in touched)
+    if suite and local and cfg.get("fresh") and not docs_only and mode(cfg, "fresh") != "off":  # CI has no local proof to show
+        stale = [g for g in cfg["fresh"] if not any(proof_holds(f, head) for f in glob.glob(str(top / g)))]
+        msgs = [f"no {g} from a passing run on this commit ({head[:8]}, nothing uncommitted, screenshots unchanged): commit, run the real-app check, read what it shows, then push." for g in stale]
+        if msgs and mode(cfg, "fresh") == "enforce":
+            return refuse(msgs)
+        found += [("fresh", m) for m in msgs]
+
+    recorder = Path(__file__).resolve().parent / "evidence"
+    if local and mode(cfg, "evidence") != "off" and recorder.is_file():  # the evidence folder is local, like the proof
+        ran = subprocess.run([sys.executable, str(recorder), "check", "--base", base, *(["--config-from", config_from] if config_from else [])],
+                             cwd=top, capture_output=True, text=True)
+        print(ran.stderr, end="", file=sys.stderr) if ran.returncode == 0 else found.append(("evidence", ran.stderr.strip()))
+
+    if suite:  # the suite runs on the files on disk, so they must be the commit being pushed
+        dirty = git("status", "--porcelain", cwd=top).splitlines()
+        if dirty:
+            return refuse(["uncommitted changes, so the suite would not run on the commit you push: commit or stash them, or push from a clean worktree:\n  " + "\n  ".join(dirty)])
+    if suite and subprocess.run(cfg["test"], shell=True, cwd=top).returncode != 0:
+        return refuse(["the full suite failed on HEAD"])
+
+    laws_now, laws_before = ids(show("HEAD", LAWS)), ids(show(base, LAWS))
+    diff = git("diff", f"{base}..HEAD", "-U0", "--", prefix)
+    changed_files: set[str] = set()
+    weakened: list[str] = []
+    path = "?"
+    for line in diff.splitlines():
+        if line.startswith("--- a/"):
+            path = line[6:].rstrip("\t")  # a deleted file's name, for the assertions it loses
+        elif line.startswith("+++ b/"):
+            path = line[6:].rstrip("\t")
+            changed_files.add(path)
+        elif line.startswith("-") and not line.startswith("---") and "assert" in line:
+            weakened.append(f"{path}: {line[1:].strip()[:100]}")
+    # A moved test file keeps its tests: compare each file with where it came from.
+    moved = dict(re.findall(r"^R\d*\t([^\t\n]+)\t([^\t\n]+)$", git("diff", "--name-status", "-M", f"{base}..HEAD", "--", prefix), re.M))
+    came_from = {new: old_path for old_path, new in moved.items()}
+    # By the parser, so a test in a class is new even when an old test elsewhere has its name.
+    added = [(f, n) for f in sorted(changed_files) if f.endswith(".py")
+             for n in sorted(test_names(show("HEAD", f)) - test_names(show(base, came_from.get(f, f))))]
+
+    for file in sorted(f for f in changed_files if f.endswith(".py")):  # which one runs is not for the gate to guess
+        defined = [n for n, _ in functions(show("HEAD", file)) if n.rpartition("::")[2].startswith("test")]
+        found += [("laws", f"{file}::{n} is defined more than once; keep one.") for n in sorted({n for n in defined if defined.count(n) > 1})]
+
+    if mode(cfg, "verified") != "off":  # CI sees commits made with --no-verify, which the commit-msg hook never did
+        for sha in git("rev-list", "--no-merges", f"{base}..HEAD").split():
+            body = git("log", "-1", "--format=%B", sha)
+            problem = None if EXEMPT.search(body) else trailer_problem(body)
+            if problem:
+                found.append(("verified", f"{sha[:8]}: {problem}"))
+
+    tagged = []
+    for file, name in added:
+        tags = TAG.findall(test_source(show("HEAD", file), name))
+        known = [t for t in tags if t in laws_now]
+        if not known:
+            found.append(("laws", f"{file}::{name} names no law or bug in {LAWS} (add [L<n>] or [B<n>] to it, or drop it)."))
+        else:
+            tagged.append((file, name, known))
+
+    if tagged and mode(cfg, "red_first") != "off":
+        old = Path(tempfile.mkdtemp(prefix="agent-check-"))
+        try:
+            git("worktree", "add", "--detach", "--quiet", str(old), base, cwd=top)
+            at_base = [f for f in names("ls-tree", "-r", "--name-only", base, "--", prefix) if f.endswith(".py")]
+            canary = next(((f, m.group(1)) for f in [f for f in at_base if f not in changed_files] + sorted(changed_files) if f in at_base
+                           for m in [re.search(r"^(?:async\s+)?def (test_\w+)\(\)", show(base, f), re.M)] if m), None)
+            ran_ok = True
+            if canary is not None:
+                # A runner that cannot run the old code would make every new test look like it fails there.
+                # It runs before the new tests are copied in, so a change that edits that test cannot break it.
+                ran = subprocess.run(cfg["one_test"].format(file=shlex.quote(canary[0]), name=shlex.quote(canary[1])), shell=True, cwd=old, capture_output=True, text=True)
+                if ran.returncode != 0:
+                    found.append(("red_first", f"could not run the old code's own test {canary[0]}::{canary[1]} at {base[:8]}, so the red-first check cannot judge: {(ran.stdout + ran.stderr).strip()[-300:]}"))
+                    ran_ok = False
+            at_head = set(names("ls-tree", "-r", "--name-only", head, "--", prefix))
+            if new_tests := sorted(changed_files & at_head):  # the tests as committed, not as on disk
+                git("checkout", head, "--", *new_tests, cwd=old)
+            for file, name, known in tagged if ran_ok else []:
+                if all(t.startswith("L") and t not in laws_before for t in known):
+                    continue  # holds a law the owner added in this push: it may already be true.
+                ran = subprocess.run(cfg["one_test"].format(file=shlex.quote(file), name=shlex.quote(name)), shell=True, cwd=old, capture_output=True, text=True)
+                if ran.returncode == 0:
+                    found.append(("red_first", f"{file}::{name} passes on the old code ({base[:8]}), so it tests nothing this change made true."))
+                elif ran.returncode != 1:  # a file that cannot load there, or a test not found, shows no bug
+                    found.append(("red_first", f"{file}::{name} could not run on the old code ({base[:8]}, exit {ran.returncode}), so it does not show that it fails there: test the bug through code the old version had. {(ran.stdout + ran.stderr).strip()[-300:]}"))
+        finally:
+            git("worktree", "remove", "--force", str(old), cwd=top, check=False)
+            shutil.rmtree(old, ignore_errors=True)
+
+    sealed_now, sealed_before = seals(show("HEAD", SEALS)), seals(show(base, SEALS))
+    if new_ids := laws_now - laws_before:  # a new law's or bug's test is sealed with it
+        for file in [f for f in names("ls-tree", "-r", "--name-only", head, "--", prefix) if f.endswith(".py")]:
+            source = show("HEAD", file)
+            for name in sorted(test_names(source)):
+                new = sorted(set(TAG.findall(test_source(source, name))) & new_ids)
+                if new and f"{file}::{name}" not in sealed_now:
+                    found.append(("seals", f"{file}::{name} holds {', '.join(new)}, added in this push, and is not sealed: the owner seals it in the same push (agent-check seal)."))
+    for ref, digest in sealed_now.items():
+        file, _, name = ref.partition("::")
+        if fingerprint(show("HEAD", file), name) != digest:
+            found.append(("seals", f"{ref} is sealed and no longer matches its seal: put the test back; only the owner re-seals."))
+    # A seal may change or go only with its law: changing a law is the owner's act (LAWS.md).
+    laws_text = lambda rev: {k + n: words(line) for line in show(rev, LAWS).splitlines() for k, n in LAW_LINE.findall(line)}
+    before_laws, now_laws = laws_text(base), laws_text("HEAD")
+    changed_laws = {i for i in before_laws.keys() | now_laws.keys() if before_laws.get(i) != now_laws.get(i)}
+    order = {c: i for i, c in enumerate(git("rev-list", "--reverse", f"{base}..HEAD").split())}
+    law_commits = git("rev-list", "--reverse", f"{base}..HEAD", "--", LAWS).split()
+
+    def sealed_at(file: str, name: str, laws: set[str]) -> str | None:
+        """The commit whose test a seal set in this push must match: where the push first wrote the
+        test, or a later one that changed (or added) its law, the owner's act; else where it was first sealed."""
+        points = [c for c in law_commits if any(laws_text(c).get(i) != laws_text(f"{c}^").get(i) for i in laws)][-1:]
+        if not test_source(show(base, file), name):
+            points += [c for c in git("rev-list", "--reverse", f"{base}..HEAD", "--", file).split() if test_source(show(c, file), name)][:1]
+        if points:
+            return max(points, key=order.get)
+        return next((c for c in git("rev-list", "--reverse", f"{base}..HEAD", "--", SEALS).split() if f"{file}::{name}" in seals(show(c, SEALS))), None)
+
+    for ref in sorted(set(sealed_now) | set(sealed_before)):
+        digest = sealed_now.get(ref)
+        file, _, name = ref.partition("::")
+        tags = set(TAG.findall(test_source(show(base, file), name))) | set(TAG.findall(test_source(show("HEAD", file), name)))
+        if sealed_before.get(ref) == digest:  # unchanged, but not put back after its law's change
+            at = sealed_at(file, name, tags) if digest and tags & changed_laws else None
+            if at and fingerprint(show(at, file), name) != digest:
+                found.append(("seals", f"{ref}: its law changed in this push ({at[:8]}) and the test was then put back as it was; it stays as that commit left it."))
+            continue
+        if ref in sealed_before and not tags & changed_laws:  # a seal may change or go only with its law
+            found.append(("seals", f"{ref}: its seal changed or was removed, but the law it holds did not change; only the owner changes a law, and with it its sealed test."))
+            continue
+        at = sealed_at(file, name, tags)
+        if digest is None:
+            if at and ref in seals(show(at, SEALS)):
+                found.append(("seals", f"{ref}: unsealed after the commit that changed its law ({at[:8]}); a seal goes only in that commit."))
+            else:
+                print(f"agent-check: {ref} re-sealed or unsealed with its law's change in this push.", file=sys.stderr)
+        elif at and fingerprint(show(at, file), name) != digest:
+            found.append(("seals", f"{ref}: sealed in this push and then changed and re-sealed; the seal must match the test as first written, or as it stood when its law last changed ({at[:8]})."))
+        elif ref in sealed_before:
+            print(f"agent-check: {ref} re-sealed or unsealed with its law's change in this push.", file=sys.stderr)
+    support = [f for f in touched if any(f.startswith(p) for p in cfg.get("seal_support", []))]
+    if sealed_now and support:
+        print("agent-check: sealed tests may lean on these, changed in this push; check they still test the same thing:\n  " + "\n  ".join(support), file=sys.stderr)
+
+    if weakened:
+        print("agent-check: assertions removed or rewritten in this push (read before it lands):\n  " + "\n  ".join(weakened), file=sys.stderr)
+    review = [f for f in touched if any(f.startswith(p) for p in cfg.get("review", []))]
+    if review:  # a reminder for commits that skipped the commit hook (rebase, cherry-pick)
+        print("agent-check: high-stakes files in this push; if no fresh review ran before it, run one now:\n  " + "\n  ".join(review), file=sys.stderr)
+    if LAWS in touched:
+        print(f"agent-check: {LAWS} changed in this push:\n{git('diff', f'{base}..HEAD', '--', LAWS)}", file=sys.stderr)
+    return finish(cfg, found)
+
+
+def audit(days: int = 30) -> int:
+    """A report for the pruning routine: what the owner may delete or fix. It changes nothing."""
+    top = root()
+    cfg = config()
+    prefix = cfg.get("tests", "tests/")
+    laws = (top / LAWS).read_text() if (top / LAWS).exists() else ""
+    known = ids(laws)
+    tags: dict[str, list[str]] = {}
+    tests: set[str] = set()
+    untagged: list[str] = []
+    for file in sorted(names("ls-files", "--", prefix)):
+        if not file.endswith(".py") or not (top / file).is_file():
+            continue
+        source = (top / file).read_text()
+        for name in test_names(source):
+            tests.add(f"{file}::{name}")
+            found = TAG.findall(test_source(source, name))
+            for tag in found:
+                tags.setdefault(tag, []).append(f"{file}::{name}")
+            if not found:
+                untagged.append(f"{file}::{name}")
+    report: list[str] = []
+    if untagged:  # often every test from before the laws: a count, not a flood
+        report.append(f"{len(untagged)} tests name no law or bug (e.g. {untagged[0]}): tag the ones that hold a law; the rest are candidates to delete.")
+    tracked = names("ls-files")
+    for q in cfg.get("question", []):
+        if not any(f.startswith(p) for f in tracked for p in q["paths"]):
+            report.append(f'question "{q["ask"]}" matches no tracked file: its paths {q["paths"]} moved or are gone.')
+    for line in laws.splitlines():
+        m = LAW_LINE.match(line)
+        if not m:
+            continue
+        law = m.group(1) + m.group(2)
+        if law not in tags and "held by" not in line.lower():
+            report.append(f"{law}: no test names it and the line says nothing holds it.")
+        for file, name in HELD_REF.findall(line):
+            if not (top / file).is_file() or not test_source((top / file).read_text(), name):
+                report.append(f"{law}: held by {file}::{name}, which no longer exists.")
+    for tag, refs in sorted(tags.items()):
+        if tag not in known:
+            report += [f"{ref} names {tag}, which is not in {LAWS}." for ref in refs]
+    seal_path = top / SEALS
+    for ref in seals(seal_path.read_text()) if seal_path.exists() else {}:
+        if ref not in tests:
+            report.append(f"{SEALS}: {ref} seals a test that no longer exists.")
+    log = git("log", "--no-merges", f"--since={days}.days", "--format=%h%x09%(trailers:key=Verified,valueonly,separator=%x2C)%x09%s").splitlines()
+    unverified = [line for line in log if re.match(r"\S+\t(none\b.*)?\t", line, re.I)]
+    print(f"agent-check audit: {len(known)} laws and bugs, {len(tests)} tests, {len(tags)} lines held by a tagged test.")
+    print("\n".join(f"- {r}" for r in report) or "- nothing stale.")
+    if mode(cfg, "verified") != "off":
+        print(f"commits in the last {days} days with no verification or \"none\": {len(unverified)} of {len(log)}")
+        print("\n".join(f"  {line.replace(chr(9), '  ')}" for line in unverified[:20]))
+    return 0
+
+
+def append(kind: str, text: str) -> int:
+    laws = root() / LAWS
+    content = laws.read_text() if laws.exists() else "# Laws\n\nOnly the owner adds or changes these lines (`agent-check law|bug`). A test names the line it holds, as [L1] or [B1].\n"
+    n = max([int(num) for k, num in LAW_LINE.findall(content) if k == kind], default=0) + 1
+    line = f"{kind}{n}: {text.strip()}\n"
+    head, bugs, tail = content.partition("\n## Bugs")
+    if kind == "L" and bugs:  # a law goes above the Bugs section, a bug at the end
+        laws.write_text(head.rstrip("\n") + "\n" + line + bugs + tail)
+    else:
+        laws.write_text(content.rstrip("\n") + "\n" + line)
+    print(f"{kind}{n}: {text.strip()}")
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    if argv[:1] == ["commit-msg"] and len(argv) == 2:
+        argv = ["commit-msg", os.path.abspath(argv[1])]
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+    if top.returncode == 0:
+        os.chdir(top.stdout.strip())  # test paths and pathspecs are relative to the top, wherever it is run from
+    match argv:
+        case ["commit"]:
+            return commit()
+        case ["commit-msg", path]:
+            return commit_msg(path)
+        case ["push"]:
+            return push()
+        case ["push", "--hook"]:
+            return push(hook=True)
+        case ["push", "--base", base, *rest]:
+            config_from = rest[rest.index("--config-from") + 1] if "--config-from" in rest[:-1] else None
+            if set(rest) - {"--no-suite"} - ({"--config-from", config_from} if config_from else set()):
+                print(__doc__)
+                return 2
+            return push(base, suite="--no-suite" not in rest, config_from=config_from)
+        case ["law", text]:
+            return append("L", text)
+        case ["bug", text]:
+            return append("B", text)
+        case ["seal", *refs] if refs:
+            return seal(refs)
+        case ["audit"]:
+            return audit()
+        case ["audit", "--days", days] if days.isdigit():
+            return audit(int(days))
+    print(__doc__)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

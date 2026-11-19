@@ -1,0 +1,54 @@
+# agent-check: what the git hooks and CI check in this repo. Docs: scripts/agent-check --help
+
+# The full suite, one test (exit 1 when it fails, another code when it cannot run), and where tests live.
+test = "python -m pytest -q"
+one_test = "python -m pytest -q -p no:cacheprovider {file}::{name}"
+tests = "tests/"
+
+# A push needs proof that the real-app check passed on exactly this commit (written by your verify skill).
+# fresh = [".test-tmp/verify/passed"]
+
+# A commit staging one of these prints "fresh review suggested".
+review = ["migrations/", "auth/", "billing/", ".github/", ".githooks/", "scripts/", ".claude/skills/verify/", "agent-check.toml", "LAWS.md", ".sealed-tests"]
+
+# Fixtures and helpers that sealed tests lean on: a push changing one warns.
+seal_support = ["tests/conftest.py", "tests/fixtures/"]
+
+# New gates start in observe: they print and log what they would refuse (.git/agent-check-observe.log)
+# without blocking. Read the log for a week, fix false positives, then switch to "enforce".
+[gates]
+fresh = "observe"
+laws = "observe"
+red_first = "observe"
+seals = "enforce"
+verified = "observe"   # stamps "Verified: none" on commits that do not say how they were checked
+evidence = "observe"   # a push whose severity owes evidence needs a passing evidence folder for this commit
+
+# Evidence by change type (scripts/evidence --help). Each push is labelled by surface, intent and
+# severity; the severity decides what it owes.
+[evidence]
+# high = ["migrations/", "auth/", "billing/"]   # default: the review list above
+# medium = ["api/"]
+# classifier = "scripts/evidence-classifier"   # a model labels the diff too (sends the diff to it); without it, path rules only
+# serve = "./run-dev.sh"              # starts the app on $PORT, so cases can call $EVIDENCE_URL
+# redact_env = ["API_TOKEN"]          # values of these variables never reach an evidence page
+keep_days = 30
+
+[evidence.owes]        # "none", "agent" (a verifier records it, nobody has to read it) or "human"
+medium = "agent"
+low = "none"           # high is always "human", and its push is refused without it
+
+# [evidence.env.production]
+# hosts = ["api.example.com"]
+# production = true    # a case here that is not --read-only waits for the owner's yes
+
+# Questions no check fully sees, asked only when a commit touches their paths. One per past incident.
+# [[question]]
+# paths = ["billing/"]
+# ask = "Can a retry or a restart charge twice? (incident 2026-01-12)"
+
+# review-eval: grade the reviewer on past bugs. Running a model reviewer costs money.
+[review_eval]
+cases = "evals/review"
+# reviewer = "your-review-command"   # reads the diff on stdin, prints FINDING important|nit|pre-existing: lines
+timeout = 600

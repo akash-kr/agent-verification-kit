@@ -1,0 +1,5 @@
+# A merged change of similar size that stayed clean: a reviewer that flags it is over-flagging.
+id = "example-clean-change"
+kind = "control"
+commit = "TODO(you): the sha of a merged change that never needed a fix"
+set = "test"

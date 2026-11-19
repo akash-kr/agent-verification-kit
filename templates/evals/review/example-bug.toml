@@ -1,0 +1,8 @@
+# A change that shipped a real bug. Copy one file per incident; keep the answer key short and true.
+id = "example-double-charge"
+kind = "bug"
+commit = "TODO(you): the sha of the change that introduced the bug"
+set = "test"          # "test" stays fixed; put cases you tune the reviewer against in "tune"
+answer = "TODO(you): one sentence, e.g. a retry after a timeout charges the card a second time."
+match = ["TODO(you)", "two or three words any correct finding must contain"]
+source = "TODO(you): the incident doc, revert commit or PR that shows the bug"

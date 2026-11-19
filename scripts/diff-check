@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""diff-check: a differential test. Run the old and the new code on the same inputs; any difference
+in output is a bug or a breaking change, unless you approved it.
+
+  diff-check --cmd CMD --base REV --inputs DIR [--approved FILE] [--exact] [--stderr]
+      old = CMD in a throwaway worktree at REV (a refactor or rewrite inside one repo)
+      new = CMD in the current directory
+  diff-check --old CMD --new CMD --inputs DIR [--approved FILE] [--exact]
+      two separate systems (a migration)
+
+Each file in DIR is fed to both commands on stdin (a sample of real traffic, or generated inputs).
+Standard output is compared after collapsing whitespace (--exact: byte for byte; --stderr: error
+output too, when the messages are part of the behaviour). FILE lists
+input names, one per line, whose difference is intended (# comments allowed). Exit 1 on any
+unapproved difference: different output, a command that fails on one side only, or one that fails on
+both (a mistyped command fails everywhere; approve an input both sides are meant to reject).
+"""
+from __future__ import annotations
+
+import argparse
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+
+def run(cmd: str, cwd: Path, data: bytes, stderr: bool) -> tuple[int, bytes]:
+    ran = subprocess.run(cmd, shell=True, cwd=cwd, input=data, capture_output=True)
+    return ran.returncode, ran.stdout + (b"\n--- stderr ---\n" + ran.stderr if stderr else b"")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--cmd")
+    ap.add_argument("--base")
+    ap.add_argument("--old")
+    ap.add_argument("--new")
+    ap.add_argument("--inputs", required=True)
+    ap.add_argument("--approved")
+    ap.add_argument("--exact", action="store_true")
+    ap.add_argument("--stderr", action="store_true")
+    args = ap.parse_args()
+    if bool(args.cmd and args.base) == bool(args.old and args.new):
+        ap.error("pass either --cmd with --base, or --old with --new")
+    approved = set()
+    if args.approved:
+        approved = {line.split("#")[0].strip() for line in Path(args.approved).read_text().splitlines()} - {""}
+    inputs = sorted(p for p in Path(args.inputs).iterdir() if p.is_file())
+    if not inputs:
+        ap.error(f"no input files in {args.inputs}")
+
+    here = Path.cwd()
+    old_dir = here
+    tree = None
+    if args.base:
+        tree = Path(tempfile.mkdtemp(prefix="diff-check-"))
+        subprocess.run(["git", "-c", "core.hooksPath=/dev/null", "worktree", "add", "--detach", "--quiet", str(tree), args.base], check=True)
+        old_dir = tree
+    old_cmd, new_cmd = (args.cmd, args.cmd) if args.cmd else (args.old, args.new)
+    norm = (lambda b: b) if args.exact else (lambda b: b" ".join(b.split()))
+    problems = []
+    any_output = False
+    try:
+        for p in inputs:
+            data = p.read_bytes()
+            (oc, oo), (nc, no) = run(old_cmd, old_dir, data, args.stderr), run(new_cmd, here, data, args.stderr)
+            any_output = any_output or bool(oo.strip() or no.strip())
+            if oc != 0 and nc != 0:  # a mistyped command fails the same way on both sides
+                if p.name not in approved:
+                    problems.append(f"{p.name}: the command fails on both sides (old exit {oc}, new exit {nc}), so nothing was compared")
+                continue
+            same = (oc == 0) == (nc == 0) and norm(oo) == norm(no)
+            if not same and p.name not in approved:
+                problems.append(f"{p.name}: old exit {oc}, new exit {nc}; outputs {'match' if norm(oo) == norm(no) else 'differ'}\n    old: {oo[:200]!r}\n    new: {no[:200]!r}")
+    finally:
+        if tree:
+            subprocess.run(["git", "worktree", "remove", "--force", str(tree)], capture_output=True)
+            shutil.rmtree(tree, ignore_errors=True)
+    if not any_output:  # a pipeline like `missing-cmd | cat` exits 0 with nothing on both sides
+        problems.append("no input produced any output on either side, so nothing was compared: check the command")
+    unused = approved - {p.name for p in inputs}
+    print(f"diff-check: {len(inputs)} inputs, {len(problems)} unapproved differences, {len(approved)} approved")
+    if unused:
+        print("approved but no such input (prune them): " + ", ".join(sorted(unused)))
+    for line in problems:
+        print("- " + line)
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

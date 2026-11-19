@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""review-eval: grade your code reviewer on bugs that actually happened.
+
+  review-eval [--cases DIR] [--reviewer CMD] [--set tune|test] [--timeout SECONDS] [--json FILE]
+
+Each case is a TOML file in DIR (default: evals/review, or [review_eval] cases in agent-check.toml):
+
+  id     = "short-name"
+  kind   = "bug"            # a change that shipped a real bug; or "control": a merged change that stayed clean
+  commit = "<sha>"          # the change under review; the reviewer sees <sha>^..<sha>
+  set    = "test"           # "tune" while you adjust the reviewer; "test" stays fixed, so you cannot overfit it
+  answer = "One sentence: what the bug was."               # bug only, for the report
+  match  = ["word", "other word"]                          # bug only: a finding catches it when it has every word
+  source = "incident doc, revert commit or PR that shows the bug"   # where the answer key came from
+
+The reviewer (--reviewer, or [review_eval] reviewer in agent-check.toml) runs in a throwaway worktree
+at <sha>, with the diff on stdin and REVIEW_BASE / REVIEW_HEAD / REVIEW_REPO (the repo root) set. When
+the command's first word is a file in the repo (./review.sh) it runs from the repo as it is now, not
+as it was at <sha>; elsewhere in the command, use "$REVIEW_REPO/tools/review.py" for that. It prints one finding per line:
+
+  FINDING important: <what is wrong and where>
+  FINDING nit: <style>
+  FINDING pre-existing: <a bug the change did not add>
+
+Only "important" findings count: one with every match word catches a bug; any on a control is a
+false flag. A reviewer that times out, or exits non-zero with no FINDING line, counts as an
+error and is left out of the ratios. The report gives recall (bugs caught) and false flags per set. Running a model reviewer
+costs money: this script makes every call the reviewer command makes.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import shlex
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import tomllib
+from pathlib import Path
+
+FINDING = re.compile(r"^FINDING\s+(important|nit|pre-existing):\s*(.+)$", re.I | re.M)
+
+
+def git(*args: str, cwd: str | Path = ".") -> str:
+    run = subprocess.run(["git", "-c", "core.hooksPath=/dev/null", *args], cwd=cwd, capture_output=True, text=True)
+    if run.returncode != 0:
+        raise SystemExit(f"review-eval: git {' '.join(args)} failed: {run.stderr.strip()}")
+    return run.stdout
+
+
+def load(cases_dir: Path) -> list[dict]:
+    cases = []
+    for path in sorted(cases_dir.glob("*.toml")):
+        case = tomllib.loads(path.read_text())
+        missing = [k for k in ("id", "kind", "commit", "set") if k not in case]
+        if case.get("kind") == "bug":
+            missing += [k for k in ("answer", "match") if k not in case]
+        if missing or case.get("kind") not in ("bug", "control") or case.get("set") not in ("tune", "test"):
+            raise SystemExit(f"review-eval: {path}: needs id, kind (bug|control), commit, set (tune|test), and for a bug answer and match; missing {missing}")
+        cases.append(case)
+    if not cases:
+        raise SystemExit(f"review-eval: no cases in {cases_dir}")
+    return cases
+
+
+def review(case: dict, reviewer: str, top: Path, timeout: int) -> tuple[list[tuple[str, str]], str]:
+    sha = git("rev-parse", "--verify", f"{case['commit']}^{{commit}}", cwd=top).strip()
+    diff = git("diff-tree", "-p", "-r", "--root", "-m", "--first-parent", "--no-commit-id", sha, cwd=top)  # a merge: against its first parent
+    tree = Path(tempfile.mkdtemp(prefix="review-eval-"))
+    try:
+        git("worktree", "add", "--detach", "--quiet", str(tree), sha, cwd=top)
+        env = {**os.environ, "REVIEW_BASE": f"{sha}^", "REVIEW_HEAD": sha, "REVIEW_REPO": str(top)}
+        # A reviewer kept in the repo may be newer than the commit under review: run today's copy.
+        first, _, rest = reviewer.strip().partition(" ")
+        if (top / first).is_file():
+            reviewer = f"{shlex.quote(str(top / first))} {rest}"
+        proc = subprocess.Popen(reviewer, shell=True, cwd=tree, env=env, text=True, start_new_session=True,
+                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            out, err = proc.communicate(diff, timeout=timeout)
+            # A reviewer may exit non-zero because it found something; one that printed no finding did not review.
+            error = "" if proc.returncode == 0 or FINDING.search(out) else f"reviewer exited {proc.returncode}: {err.strip()[-200:]}"
+        except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL)  # the whole group, so a child holding the pipe cannot hang us
+            proc.communicate()
+            out, error = "", f"reviewer timed out after {timeout}s"
+        except BaseException:  # Ctrl-C: its own session never got the signal, and a paid reviewer would keep billing
+            os.killpg(proc.pid, signal.SIGKILL)
+            raise
+    finally:
+        subprocess.run(["git", "worktree", "remove", "--force", str(tree)], cwd=top, capture_output=True)
+        shutil.rmtree(tree, ignore_errors=True)
+    return [(sev.lower(), text) for sev, text in FINDING.findall(out)], error
+
+
+def grade(case: dict, findings: list[tuple[str, str]]) -> bool:
+    important = [text.lower() for sev, text in findings if sev == "important"]
+    if case["kind"] == "control":
+        return not important
+    return any(all(w.lower() in text for w in case["match"]) for text in important)
+
+
+def main() -> int:
+    top = Path(git("rev-parse", "--show-toplevel").strip())
+    cfg_path = top / "agent-check.toml"
+    cfg = tomllib.loads(cfg_path.read_text()).get("review_eval", {}) if cfg_path.exists() else {}
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--cases", default=cfg.get("cases", "evals/review"))
+    ap.add_argument("--reviewer", default=cfg.get("reviewer"))
+    ap.add_argument("--set", choices=["tune", "test"])
+    ap.add_argument("--timeout", type=int, default=int(cfg.get("timeout", 600)))
+    ap.add_argument("--json")
+    args = ap.parse_args()
+    if not args.reviewer:
+        ap.error("no reviewer: pass --reviewer or set [review_eval] reviewer in agent-check.toml")
+    cases = [c for c in load(top / args.cases) if not args.set or c["set"] == args.set]
+
+    results = []
+    for case in cases:
+        findings, error = review(case, args.reviewer, top, args.timeout)
+        ok = not error and grade(case, findings)
+        results.append({"id": case["id"], "kind": case["kind"], "set": case["set"], "ok": ok, "error": error, "findings": findings})
+        word = "ERROR" if error else {"bug": "caught" if ok else "MISSED", "control": "clean" if ok else "FALSE FLAG"}[case["kind"]]
+        print(f"{case['set']:5} {case['kind']:7} {case['id']:30} {word}{'  (' + error + ')' if error else ''}")
+        if case["kind"] == "bug" and not ok:
+            print(f"      answer: {case['answer']}")
+
+    for s in sorted({r["set"] for r in results}):
+        graded = [r for r in results if r["set"] == s and not r["error"]]  # a run that failed grades nothing
+        bugs = [r for r in graded if r["kind"] == "bug"]
+        controls = [r for r in graded if r["kind"] == "control"]
+        print(f"{s}: recall {sum(r['ok'] for r in bugs)}/{len(bugs)} bugs caught, "
+              f"false flags {sum(not r['ok'] for r in controls)}/{len(controls)} clean changes, "
+              f"errors {sum(bool(r['error']) for r in results if r['set'] == s)}")
+    if args.json:
+        Path(args.json).write_text(json.dumps(results, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

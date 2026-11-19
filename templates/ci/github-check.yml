@@ -1,0 +1,39 @@
+name: agent-check
+
+# The same checks as the push hook, for every push to the default branch and every PR.
+# The checker and its config come from the BASE commit, so a change cannot loosen the gate that judges it.
+# What this does not cover: this workflow file itself comes from the pushed commit. Protect it with
+# branch protection and CODEOWNERS on .github/, and read every change to it.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the red-first check runs new tests on the commit before them
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # TODO(you): install what your suite needs, e.g. `pip install -e .[dev]`. The step below runs the suite itself.
+      - name: agent-check (from the base commit)
+        if: github.event_name == 'pull_request' || github.event.before != '0000000000000000000000000000000000000000'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if ! git show "${BASE}:scripts/agent-check" > "$RUNNER_TEMP/agent-check" 2>/dev/null; then
+            echo "::warning::the base commit has no checker yet, so this change is judged by its own copy: the owner reviews this one by hand."
+            cp scripts/agent-check "$RUNNER_TEMP/agent-check"
+          fi
+          if ! git diff --quiet "$BASE" HEAD -- scripts/agent-check agent-check.toml LAWS.md .sealed-tests .claude/skills/verify .githooks; then
+            echo "::warning::this change edits the laws, seals, checker, its config, hooks or verify skill; the checker and config are the base version, the rest needs the owner's review (CODEOWNERS)."
+          fi
+          python3 "$RUNNER_TEMP/agent-check" push --base "$BASE" --config-from "$BASE"  # runs the base config's suite

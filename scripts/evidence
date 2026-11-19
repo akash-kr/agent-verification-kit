@@ -1,0 +1,625 @@
+#!/usr/bin/env python3
+"""evidence: decide what proof a change owes, record it from real runs, and keep it readable.
+
+  evidence classify [--base REV]      label the diff REV..HEAD: surfaces, intent, severity, what is owed.
+  evidence start [--base REV] [--slug S] [--intent I] [--severity S] [--request FILE]
+                                      open the evidence folder for HEAD and print what it must show.
+  evidence run --case "what this proves" [--surface S] [--input TEXT]
+               [--expect-exit N] [--expect-status N] [--expect-output TEXT]
+               [--expect-contains TEXT]... [--expect-not-contains TEXT]...
+               [--before] [--env NAME] [--read-only] [--timeout SECONDS] -- COMMAND...
+                                      run COMMAND for real and record what came back. One argument
+                                      after -- is a shell line; several are run as given.
+                                      --before also runs it on the old code, where it must NOT meet
+                                      the expectation (that is the bug, shown).
+                                      $EVIDENCE_URL in a shell line is the app, started from
+                                      [evidence] serve (old code for the before run).
+  evidence attach --case "what this shows" [--surface S] FILE...
+                                      add screenshots or a recording to media/.
+  evidence stitch --out NAME.mp4 [--seconds N] IMAGE...
+                                      join screenshots into one clip (needs ffmpeg).
+  evidence finish                     write evidence.md, the proof and the index line; prune old media.
+  evidence check [--base REV] [--config-from REV]
+                                      the push gate: exit 1 when this push owes evidence and has none.
+  evidence override --reason "why"    the owner passes one refusal, at a terminal; it is logged.
+  evidence brief                      print the brief for an independent verifier.
+  evidence prune                      delete recordings past their keep time; fill in release tags.
+
+agent-check.toml:
+  [evidence]
+  dir = "evidence"                    one folder per push, outside git unless you commit it
+  high = ["migrations/", "billing/"]  touching one of these is high severity (default: the review list)
+  medium = ["api/"]
+  classifier = "scripts/evidence-classifier"   optional: reads the diff on stdin, prints JSON
+                                      {"surfaces": [...], "intent": "...", "severity": "..."};
+                                      it can add surfaces and raise severity, never lower them
+  serve = "./run-dev.sh"              starts the app on $PORT, for $EVIDENCE_URL
+  ready = "/"                         path that answers once the app is up
+  redact_env = ["API_TOKEN"]          values of these variables are replaced in everything recorded
+  keep_days = 30                      recordings older than this are deleted (not high, not tagged)
+  max_media_mb = 25
+  [evidence.owes]                     low | medium = "none" | "agent" | "human"; high is always "human"
+  medium = "agent"
+  low = "none"
+  [evidence.env.production]
+  hosts = ["api.example.com"]
+  production = true                   a case here that is not --read-only needs the owner's yes
+"""
+from __future__ import annotations
+
+import argparse
+import datetime
+import hashlib
+import json
+import os
+import re
+import shlex
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+import tomllib
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+# surface: (what the evidence must show, path patterns for the rules classifier; first match wins)
+SURFACES: dict[str, tuple[str, str]] = {
+    "migration": ("run on a copy: schema and row counts before and after, sample rows, the rollback, time taken",
+                  r"(^|/)(migrations?|alembic|db/migrate)/|\.sql$|schema\.prisma$"),
+    "security": ("the allowed request succeeding and the forbidden one refused, each as a different user",
+                 r"(^|/|_)(auth|oauth|permissions?|acl|rbac|sessions?|login|password|crypto)([/_.]|$)"),
+    "job": ("the job triggered once: what it picked up, what it wrote, what a second run does",
+            r"(^|/|_)(jobs?|workers?|queues?|cron|scheduler|tasks)([/_.]|$)"),
+    "tests": ("per test: input, expected, actual, and that it fails on the old code",
+              r"(^|/)(tests?|__tests__|spec)/|(^|/)test_[^/]*$|\.(test|spec)\.[a-z]+$|_test\.[a-z]+$"),
+    "docs": ("the rendered page or text, before and after", r"\.(md|mdx|rst|txt)$|(^|/)docs?/"),
+    "dependency": ("old and new version, what the changelog says breaks, the flows that use it re-run",
+                   r"(^|/)(package(-lock)?\.json|yarn\.lock|pnpm-lock\.yaml|requirements[^/]*\.txt|uv\.lock|poetry\.lock|Pipfile(\.lock)?|go\.(mod|sum)|Cargo\.(toml|lock)|Gemfile(\.lock)?|pom\.xml|build\.gradle(\.kts)?)$"),
+    "config": ("the value before and after, and the thing it controls behaving differently (or a dry run)",
+               r"(^|/)(\.github|\.gitlab|\.circleci|\.githooks|terraform|infra|deploy|k8s|helm)/|(^|/)(Dockerfile|Makefile|Procfile)|\.(ya?ml|toml|ini|cfg|tf|env\.example)$"),
+    "prompt": ("the same fixed inputs before and after, outputs side by side", r"(^|/)prompts?/|\.prompt(\.[a-z]+)?$"),
+    "ui": ("screenshots at phone and desktop width, one real recording, console and failed network requests",
+           r"\.(html?|css|scss|less|jsx|tsx|vue|svelte|astro|swift|kt|xib|storyboard)$|(^|/)(templates|components|pages|views|screens|static|public|styles)/"),
+    "api": ("the exact request and response for one success and each failure case",
+            r"(^|/|_)(api|routes?|controllers?|handlers?|endpoints?|graphql|resolvers?|rpc)([/_.]|$)"),
+    "cli": ("the command typed and its real output, for one good and one bad input", r"(^|/)(bin|cli|cmd|scripts)/|(^|/)cli\.[a-z]+$"),
+    "performance": ("the same measurement before and after, with the method and the number of runs", r"(?!)"),
+    "logic": ("a table of input, expected output and actual output from calling it for real", r""),
+    "exploration": ("each claim with its source or the command that showed it", r"(?!)"),
+}
+RISKY = ("migration", "security", "job")           # always owe their own evidence, and are at least medium
+OUTER = ("ui", "api", "cli", "logic")              # the outermost one a person uses covers the ones behind it
+OWN = ("config", "dependency", "prompt", "performance")
+INTENTS = ("bug", "feature", "refactor", "exploration")
+LEVELS = ("low", "medium", "high")
+OWES = ("none", "agent", "human")
+MEDIA = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".mp4", ".webm", ".mov")
+REDACT = [
+    (re.compile(r"(?i)\b(authorization|proxy-authorization|cookie|set-cookie|x-api-key|x-auth-token)(\s*[:=]\s*)([^\r\n'\"]+)"), r"\1\2[redacted]"),
+    (re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}"), r"\1 [redacted]"),
+    (re.compile(r"(?i)\b([\w.-]*(?:api[_-]?key|secret|token|passw(?:or)?d|private[_-]?key)[\w.-]*)(\"?\s*[:=]\s*\"?)([^\s\"'&,;}]{6,})"), r"\1\2[redacted]"),
+    (re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}"), "[redacted-jwt]"),
+    (re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"), "[redacted-email]"),
+]
+
+
+def die(msg: str, code: int = 1):
+    print(f"evidence: {msg}", file=sys.stderr)
+    raise SystemExit(code)
+
+
+def git(*args: str, cwd: str | Path = ".", check: bool = True) -> str:
+    pinned = ["-c", "core.hooksPath=/dev/null", "-c", "color.ui=never", "-c", "core.quotePath=false"]
+    run = subprocess.run(["git", *pinned, *args], cwd=cwd, capture_output=True, text=True)
+    if check and run.returncode != 0:
+        die(f"git {' '.join(args)} failed: {run.stderr.strip()}")
+    return run.stdout
+
+
+def config(rev: str | None = None) -> dict:
+    """agent-check.toml, from disk or from a commit (the gate reads the base's, which the change cannot edit)."""
+    if rev:
+        git("rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}")
+        text = git("show", f"{rev}:agent-check.toml", check=False)
+    else:
+        text = Path("agent-check.toml").read_text() if Path("agent-check.toml").exists() else ""
+    cfg = tomllib.loads(text) if text else {}
+    ev = cfg.get("evidence", {})
+    for level, owes in ev.get("owes", {}).items():
+        if level not in ("low", "medium") or owes not in OWES:
+            die(f'agent-check.toml [evidence.owes] {level} = {owes!r}: set low or medium to "none", "agent" or "human" (high is always "human").')
+    return cfg
+
+
+def default_base() -> str:
+    for ref in ("@{upstream}", "origin/HEAD", "origin/main", "origin/master"):
+        run = subprocess.run(["git", "merge-base", ref, "HEAD"], capture_output=True, text=True)
+        if run.returncode == 0:
+            return run.stdout.strip()
+    die("cannot tell where this change starts: pass --base <commit>.")
+
+
+def changed(base: str) -> list[str]:
+    # --no-renames: a file moved out of a high-stakes folder still counts as touching it
+    return [n for n in git("diff", "-z", "--name-only", "--no-renames", f"{base}..HEAD").split("\0") if n]
+
+
+def classify(base: str, cfg: dict, model: bool = True) -> dict:
+    """Surfaces, intent and severity for base..HEAD. Rules first; a configured classifier may add and raise."""
+    base = git("rev-parse", "--verify", f"{base}^{{commit}}").strip()
+    ev, files = cfg.get("evidence", {}), changed(base)
+    touched: dict[str, list[str]] = {}
+    for f in files:
+        surface = next(s for s, (_, pattern) in SURFACES.items() if re.search(pattern, f))
+        touched.setdefault(surface, []).append(f)
+    subjects = git("log", "--format=%s", f"{base}..HEAD").lower()
+    intent = ("exploration" if not files else "bug" if re.search(r"^(fix|bug|hotfix)\b|^revert ", subjects, re.M)
+              else "refactor" if re.search(r"^(refactor|chore|cleanup|perf)\b", subjects, re.M) else "feature")
+    floor = lambda key, default: any(f.startswith(p) for f in files for p in ev.get(key, default))
+    severity = "high" if floor("high", cfg.get("review", [])) else "medium" if floor("medium", []) or set(touched) & set(RISKY) else "low"
+    surfaces, note = set(touched), "rules"
+    if model and ev.get("classifier") and files:
+        ran = subprocess.run(ev["classifier"], shell=True, input=git("diff", f"{base}..HEAD"), capture_output=True, text=True)
+        try:
+            said = json.loads(ran.stdout[ran.stdout.index("{"):ran.stdout.rindex("}") + 1])
+            surfaces |= {s for s in said.get("surfaces", []) if s in SURFACES}
+            if said.get("intent") in INTENTS:
+                intent = said["intent"]
+            if said.get("severity") in LEVELS:  # may raise the floor, never lower it
+                severity = max(severity, said["severity"], key=LEVELS.index)
+            note = "rules + classifier"
+        except (ValueError, AttributeError):
+            note = f"rules (the classifier gave no JSON, exit {ran.returncode})"
+    owed = [s for s in RISKY if s in surfaces] + [s for s in OUTER if s in surfaces][:1] + [s for s in OWN if s in surfaces]
+    owed = owed or [s for s in ("tests", "docs") if s in surfaces][:1] or (["exploration"] if not files else [])
+    level = "human" if severity == "high" else ev.get("owes", {}).get(severity, "agent" if severity == "medium" else "none")
+    return {"base": base, "head": git("rev-parse", "HEAD").strip(), "surfaces": sorted(surfaces), "owed": owed,
+            "intent": intent, "severity": severity, "level": level, "by": note, "files": len(files)}
+
+
+def home(cfg: dict) -> Path:
+    return Path(cfg.get("evidence", {}).get("dir", "evidence"))
+
+
+def folder(cfg: dict, head: str | None = None) -> Path:
+    head = head or git("rev-parse", "HEAD").strip()
+    found = sorted(home(cfg).glob(f"*-{head[:10]}"))
+    if not found:
+        die("no evidence folder for this commit: run `evidence start` first (a new commit needs new evidence).")
+    return found[-1]
+
+
+def tree_state(cfg: dict) -> str:
+    """"clean", or the files that differ from the commit (the evidence folder itself aside)."""
+    dirty = [line[3:] for line in git("status", "--porcelain", "--", ".", f":(exclude){home(cfg)}").splitlines()]
+    return "clean" if not dirty else "uncommitted: " + ", ".join(dirty[:5])
+
+
+def redact(text: str, cfg: dict) -> str:
+    for name in cfg.get("evidence", {}).get("redact_env", []):
+        if len(os.environ.get(name, "")) >= 4:
+            text = text.replace(os.environ[name], f"[redacted-{name}]")
+    for pattern, to in REDACT:
+        text = pattern.sub(to, text)
+    # local paths name the machine's user: the repo is "." and the home folder "~"
+    for path, to in ((os.getcwd(), "."), (os.path.realpath(os.getcwd()), "."), (os.path.expanduser("~"), "~")):
+        text = text.replace(path, to)
+    return text
+
+
+def clip(text: str, lines: int = 60, chars: int = 6000) -> str:
+    kept = "\n".join(text.splitlines()[:lines])[:chars]
+    return kept if kept.strip() == text.strip() else kept.rstrip() + "\n[… cut for length]"
+
+
+class App:
+    """The app started from [evidence] serve on a free port, for commands that use $EVIDENCE_URL."""
+    def __init__(self, cfg: dict, cwd: Path):
+        ev = cfg.get("evidence", {})
+        if not ev.get("serve"):
+            die("the command uses $EVIDENCE_URL but agent-check.toml has no [evidence] serve to start the app.")
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+        self.url, self.log = f"http://127.0.0.1:{port}", tempfile.NamedTemporaryFile(prefix="evidence-app-", suffix=".log", delete=False)
+        self.proc = subprocess.Popen(ev["serve"], shell=True, cwd=cwd, env={**os.environ, "PORT": str(port)},
+                                     stdout=self.log, stderr=subprocess.STDOUT, start_new_session=True)
+        deadline = time.time() + int(ev.get("ready_seconds", 30))
+        while True:
+            try:
+                urllib.request.urlopen(self.url + ev.get("ready", "/"), timeout=2)
+                return
+            except urllib.error.HTTPError:
+                return  # it answered, which is all "up" means
+            except OSError:
+                if time.time() > deadline or self.proc.poll() is not None:
+                    self.stop()
+                    die(f"the app did not come up from `{ev['serve']}` in {cwd}: {Path(self.log.name).read_text()[-400:]}")
+                time.sleep(0.3)
+
+    def stop(self):
+        try:
+            os.killpg(self.proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        self.proc.wait()
+
+
+def execute(command: list[str], cwd: Path, cfg: dict, timeout: int) -> dict:
+    shell = len(command) == 1
+    line = command[0] if shell else shlex.join(command)
+    app = App(cfg, cwd) if "EVIDENCE_URL" in line else None
+    env = {**os.environ, **({"EVIDENCE_URL": app.url} if app else {})}
+    started = time.time()
+    proc = subprocess.Popen(line if shell else command, shell=shell, cwd=cwd, env=env, text=True, errors="replace",
+                            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True)
+    try:
+        out, err = proc.communicate(timeout=timeout)
+        code: int | str = proc.returncode
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGKILL)
+        out, err = proc.communicate()
+        code = f"timed out after {timeout}s"
+    except BaseException:
+        os.killpg(proc.pid, signal.SIGKILL)
+        raise
+    finally:
+        if app:
+            app.stop()
+    statuses = re.findall(r"^HTTP/[\d.]+ (\d{3})", out + "\n" + err, re.M)
+    return {"exit": code, "status": int(statuses[-1]) if statuses else None, "seconds": round(time.time() - started, 2),
+            "out": clip(redact(out, cfg), 200, 20000), "err": clip(redact(err, cfg), 40, 4000)}
+
+
+def unmet(result: dict, a: argparse.Namespace) -> list[str]:
+    """Each expectation the run did not meet, in words."""
+    out, missing = result["out"] + result["err"], []
+    want_exit = a.expect_exit if a.expect_exit is not None else (0 if a.expect_status is None else None)
+    if want_exit is not None and result["exit"] != want_exit:
+        missing.append(f"exit {result['exit']}, expected {want_exit}")
+    if a.expect_status is not None and result["status"] != a.expect_status:
+        missing.append(f"status {result['status']}, expected {a.expect_status}")
+    if a.expect_output is not None and result["out"].strip() != a.expect_output.strip():
+        missing.append("output differs from the expected output")
+    missing += [f"output lacks {t!r}" for t in a.expect_contains if t not in out]
+    missing += [f"output has {t!r}" for t in a.expect_not_contains if t in out]
+    return missing
+
+
+def expectation(a: argparse.Namespace) -> str:
+    parts = [f"exit {a.expect_exit}"] if a.expect_exit is not None else []
+    parts += [f"status {a.expect_status}"] if a.expect_status is not None else []
+    parts += [f"output is exactly `{a.expect_output.strip()}`"] if a.expect_output is not None else []
+    parts += [f"output has `{t}`" for t in a.expect_contains] + [f"output does not have `{t}`" for t in a.expect_not_contains]
+    return "; ".join(parts) or "exit 0"
+
+
+def guard_production(line: str, a: argparse.Namespace, cfg: dict):
+    """A write on production waits for the owner. The recorder cannot see what a command does, so it
+    trusts --read-only and the declared --env; it refuses when either is missing."""
+    envs = cfg.get("evidence", {}).get("env", {})
+    prod = {name: e.get("hosts", []) for name, e in envs.items() if e.get("production")}
+    hit = [name for name, hosts in prod.items() if any(h and h in line for h in hosts)]
+    if hit and a.env not in hit:
+        die(f"the command names a production host ({hit[0]}) but the run says --env {a.env}: pass --env {hit[0]}.")
+    if a.env in prod and not a.read_only:
+        if not sys.stdin.isatty():
+            die(f"this case can write on production ({a.env}) and nobody is at a terminal to approve it: the owner runs it, or mark a case that only reads with --read-only.")
+        if input(f"evidence: run on PRODUCTION ({a.env}), may write:\n  {line}\nType yes to run it: ").strip() != "yes":
+            die("not run.")
+
+
+def record(a: argparse.Namespace) -> int:
+    cfg = config()
+    dest = folder(cfg)
+    labels = json.loads((dest / "labels.json").read_text())
+    if not a.command:
+        die("give the command after --")
+    line = a.command[0] if len(a.command) == 1 else shlex.join(a.command)
+    guard_production(line, a, cfg)
+    after = execute(a.command, Path.cwd(), cfg, a.timeout)
+    after["unmet"] = unmet(after, a)
+    case = {"case": a.case, "surface": a.surface or (labels["owed"] or ["logic"])[0], "input": a.input, "env": a.env,
+            "command": redact(line, cfg), "expect": expectation(a), "after": after, "head": labels["head"],
+            "state": tree_state(cfg), "ok": not after["unmet"]}
+    if a.before:
+        old = Path(tempfile.mkdtemp(prefix="evidence-before-"))
+        try:
+            git("worktree", "add", "--detach", "--quiet", str(old), labels["base"])
+            before = execute(a.command, old, cfg, a.timeout)
+        finally:
+            git("worktree", "remove", "--force", str(old), check=False)
+            shutil.rmtree(old, ignore_errors=True)
+        before["unmet"] = unmet(before, a)
+        case["before"] = before
+        if before["exit"] in (126, 127) or isinstance(before["exit"], str):  # it never ran there: that shows nothing
+            case["ok"], case["flag"] = False, f"could not run on the old code ({labels['base'][:8]}: exit {before['exit']}), so the before run is inconclusive"
+        elif not before["unmet"]:  # it already passed there, so this case does not show the change
+            case["ok"], case["flag"] = False, f"passes on the old code ({labels['base'][:8]}) too, so it does not show what this change fixed or added"
+    with (dest / "cases.jsonl").open("a") as f:
+        f.write(json.dumps(case) + "\n")
+    word = "PASS" if case["ok"] else "FAIL"
+    print(f"{word}  {a.case}" + ("" if case["ok"] else f"  ({case.get('flag') or '; '.join(after['unmet'])})"))
+    return 0 if case["ok"] else 1
+
+
+def attach(a: argparse.Namespace) -> int:
+    cfg = config()
+    dest, cap = folder(cfg), float(cfg.get("evidence", {}).get("max_media_mb", 25))
+    labels = json.loads((dest / "labels.json").read_text())
+    (dest / "media").mkdir(exist_ok=True)
+    kept = []
+    for src in map(Path, a.files):
+        if not src.is_file() or src.suffix.lower() not in MEDIA:
+            die(f"{src}: not an image or video file ({', '.join(MEDIA)}).")
+        if src.stat().st_size > cap * 1024 * 1024:
+            die(f"{src}: {src.stat().st_size / 1048576:.0f} MB is over the {cap:.0f} MB cap: record only the steps that prove the change, or compress it.")
+        shutil.copy2(src, dest / "media" / src.name)
+        kept.append(src.name)
+    with (dest / "cases.jsonl").open("a") as f:
+        f.write(json.dumps({"case": a.case, "surface": a.surface or "ui", "media": kept, "head": labels["head"],
+                            "state": tree_state(cfg), "ok": True}) + "\n")
+    print(f"attached {', '.join(kept)}")
+    return 0
+
+
+def stitch(a: argparse.Namespace) -> int:
+    if not shutil.which("ffmpeg"):
+        die("ffmpeg is not installed: install it, or attach the screenshots on their own.")
+    listing = Path(tempfile.mkstemp(suffix=".txt")[1])
+    listing.write_text("".join(f"file '{Path(i).resolve()}'\nduration {a.seconds}\n" for i in a.images) + f"file '{Path(a.images[-1]).resolve()}'\n")
+    ran = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(listing),
+                          "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p", "-r", "10", a.out], capture_output=True, text=True)
+    listing.unlink()
+    if ran.returncode != 0:
+        die(f"ffmpeg failed: {ran.stderr.strip()[-300:]}")
+    print(f"wrote {a.out}: attach it with `evidence attach`")
+    return 0
+
+
+def start(a: argparse.Namespace) -> int:
+    cfg = config()
+    labels = classify(a.base or default_base(), cfg)
+    if a.intent:
+        labels["intent"] = a.intent
+    if a.severity and LEVELS.index(a.severity) > LEVELS.index(labels["severity"]):  # raise only
+        labels["severity"], labels["level"] = a.severity, "human" if a.severity == "high" else labels["level"]
+    slug = re.sub(r"[^a-z0-9]+", "-", (a.slug or git("log", "-1", "--format=%s")).lower()).strip("-")[:40] or "change"
+    dest = home(cfg) / f"{datetime.date.today().isoformat()}-{slug}-{labels['head'][:10]}"
+    for stale in home(cfg).glob(f"*-{labels['head'][:10]}"):
+        shutil.rmtree(stale)  # one folder per commit: starting again starts clean
+    dest.mkdir(parents=True)
+    if a.request:
+        labels["request"] = redact(Path(a.request).read_text().strip(), cfg)
+    (dest / "labels.json").write_text(json.dumps(labels, indent=2) + "\n")
+    print(f"{dest}\n" + owes_text(labels))
+    return 0
+
+
+def owes_text(labels: dict) -> str:
+    lines = [f"surfaces: {', '.join(labels['surfaces']) or 'none'}   intent: {labels['intent']}   severity: {labels['severity']}   owes: {labels['level']}   (by {labels['by']})"]
+    lines += [f"  {s}: {SURFACES[s][0]}" for s in labels["owed"]]
+    if labels["intent"] == "bug":
+        lines.append("  bug fix: run at least one case with --before, so the page shows it failing on the old code.")
+    return "\n".join(lines)
+
+
+def gaps(labels: dict, cases: list[dict]) -> list[str]:
+    """What the page still lacks for the labels it carries."""
+    missing = [f"{c['case']}: {c.get('flag') or '; '.join(c['after']['unmet'])}" for c in cases if not c["ok"]]
+    missing += [f"no case for the {s} surface ({SURFACES[s][0]})" for s in labels["owed"] if not any(c["surface"] == s for c in cases)]
+    if "ui" in labels["owed"] and not any(c.get("media") for c in cases):
+        missing.append("the ui surface has no screenshot or recording attached")
+    ran = [c for c in cases if "after" in c]
+    if labels["intent"] == "bug" and ran and not any("before" in c for c in ran):
+        missing.append("a bug fix with no case replayed on the old code (--before)")
+    missing += [f"{c['case']}: recorded on commit {c['head'][:8]}, not this one" for c in cases if c["head"] != labels["head"]]
+    missing += [f"{c['case']}: recorded with files that are not in the commit ({c['state'][13:]}): commit or ignore them, then record again"
+                for c in cases if c["state"] != "clean"]
+    return missing
+
+
+def side(result: dict | None) -> str:
+    if result is None:
+        return "—"
+    got = f"exit {result['exit']}" + (f", status {result['status']}" if result["status"] else "") + f", {result['seconds']}s"
+    return f"{'meets it' if not result['unmet'] else 'does not: ' + '; '.join(result['unmet'])} ({got})"
+
+
+def page(labels: dict, cases: list[dict], missing: list[str]) -> str:
+    verdict = "PASS" if not missing else "INCOMPLETE"
+    md = [f"# Evidence: {verdict}", "",
+          f"- Commit: `{labels['head'][:10]}` (change starts at `{labels['base'][:10]}`, {labels['files']} files)",
+          f"- Surfaces: {', '.join(labels['surfaces']) or 'none'}. Intent: {labels['intent']}. Severity: {labels['severity']} (labelled by {labels['by']}).",
+          f"- Recorded by: {labels.get('driver', 'not stated')}. Every result below was captured from a real run, not typed."]
+    if labels.get("request"):
+        md += ["", "**Asked for:** " + labels["request"]]
+    if missing:
+        md += ["", "## Not shown yet", ""] + [f"- {m}" for m in missing]
+    for n, c in enumerate(cases, 1):
+        md += ["", f"## {n}. {c['case']} — {'PASS' if c['ok'] else 'FAIL'}", "", f"Surface: {c['surface']}" + (f" · environment: {c['env']}" if c.get("env") else "")]
+        if c.get("media"):
+            md += [""] + [f"![{m}](media/{m})" if not m.lower().endswith((".mp4", ".webm", ".mov")) else f"[Recording: {m}](media/{m})" for m in c["media"]]
+            continue
+        if c.get("flag"):
+            md += ["", f"**Flag:** {c['flag']}."]
+        md += ["", "| | |", "|---|---|"]
+        md += [f"| Input | {c['input']} |"] if c.get("input") else []
+        md += [f"| Expected | {c['expect']} |"]
+        md += [f"| Before (old code) | {side(c['before'])} |"] if "before" in c else []
+        md += [f"| After (this commit) | {side(c['after'])} |", "", "Ran:", "", "```", c["command"], "```", "", "Got:", "", "```", clip(c["after"]["out"] or c["after"]["err"] or "(no output)").rstrip(), "```"]
+        if "before" in c:
+            md += ["", "On the old code it gave:", "", "```", clip(c["before"]["out"] or c["before"]["err"] or "(no output)", 25).rstrip(), "```"]
+    return "\n".join(md) + "\n"
+
+
+def index(cfg: dict):
+    """evidence/INDEX.md: one line per change, newest first, with the release each shipped in."""
+    rows = []
+    for labels_file in sorted(home(cfg).glob("*/labels.json"), reverse=True):
+        labels = json.loads(labels_file.read_text())
+        if "verdict" not in labels:
+            continue
+        tags = git("tag", "--contains", labels["head"], "--sort=creatordate", check=False).split()
+        name = labels_file.parent.name
+        rows.append(f"| {name[:10]} | [{name[11:-11]}]({name}/evidence.md) | {', '.join(labels['surfaces'])} | {labels['intent']} | "
+                    f"{labels['severity']} | {labels['verdict']} | `{labels['head'][:10]}` | {tags[0] if tags else ''} |")
+    (home(cfg) / "INDEX.md").write_text("# Evidence index\n\n| Date | Change | Surfaces | Intent | Severity | Verdict | Commit | Release |\n|---|---|---|---|---|---|---|---|\n" + "\n".join(rows) + "\n")
+
+
+def prune(cfg: dict) -> int:
+    """Recordings and screenshots go after keep_days, except for high severity and tagged releases. Text stays."""
+    keep, removed = int(cfg.get("evidence", {}).get("keep_days", 30)), 0
+    for labels_file in home(cfg).glob("*/labels.json"):
+        labels, media = json.loads(labels_file.read_text()), labels_file.parent / "media"
+        try:
+            age = (datetime.date.today() - datetime.date.fromisoformat(labels_file.parent.name[:10])).days
+        except ValueError:
+            continue
+        if media.is_dir() and age > keep and labels["severity"] != "high" and not git("tag", "--points-at", labels["head"], check=False).strip():
+            removed += len(list(media.iterdir()))
+            shutil.rmtree(media)
+    index(cfg)
+    return removed
+
+
+def finish(_: argparse.Namespace) -> int:
+    cfg = config()
+    dest = folder(cfg)
+    labels = json.loads((dest / "labels.json").read_text())
+    log = dest / "cases.jsonl"
+    cases = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+    missing = gaps(labels, cases)
+    if not cases:
+        missing.append("no case was recorded")
+    labels["verdict"] = "PASS" if not missing else "INCOMPLETE"
+    labels["driver"] = os.environ.get("EVIDENCE_DRIVER", "the author")
+    (dest / "labels.json").write_text(json.dumps(labels, indent=2) + "\n")
+    (dest / "evidence.md").write_text(page(labels, cases, missing))
+    proof = dest / "passed"
+    proof.unlink(missing_ok=True)
+    if not missing:  # the proof names the commit and hashes every file, so an edited page no longer matches
+        files = [dest / "evidence.md", dest / "labels.json", log] + sorted((dest / "media").glob("*") if (dest / "media").is_dir() else [])
+        # paths from the repo top: no home folder in a file that may be committed
+        proof.write_text("\n".join([labels["head"], "clean"] + [f"{hashlib.sha256(f.read_bytes()).hexdigest()}  {f}" for f in files]) + "\n")
+    removed = prune(cfg)
+    print(f"{labels['verdict']}  {dest / 'evidence.md'}" + (f"  (pruned {removed} old media files)" if removed else ""))
+    for m in missing:
+        print(f"- {m}")
+    return 0 if not missing else 1
+
+
+def proof_holds(dest: Path, head: str) -> bool:
+    proof = dest / "passed"
+    if not proof.is_file():
+        return False
+    lines = proof.read_text().splitlines()
+    if lines[:2] != [head, "clean"] or len(lines) < 3:
+        return False
+    return all(Path(shot).is_file() and hashlib.sha256(Path(shot).read_bytes()).hexdigest() == digest
+               for digest, _, shot in (line.partition("  ") for line in lines[2:]))
+
+
+def check(a: argparse.Namespace) -> int:
+    """The push gate. Severity is worked out again here, by the rules and the base's config, so a
+    labels file written by the author cannot lower it."""
+    base = git("rev-parse", "--verify", f"{a.base or default_base()}^{{commit}}").strip()
+    # the base's config when it has one, so a push cannot lower its own floor by editing the config
+    has = subprocess.run(["git", "cat-file", "-e", f"{base}:agent-check.toml"], capture_output=True).returncode == 0
+    cfg = config(a.config_from or base) if a.config_from or has else config()
+    floor = classify(base, cfg, model=False)
+    if floor["level"] == "none":
+        return 0
+    head = floor["head"]
+    found = sorted(home(cfg).glob(f"*-{head[:10]}"))
+    if found and proof_holds(found[-1], head):
+        labels = json.loads((found[-1] / "labels.json").read_text())
+        short = [s for s in floor["owed"] if s in RISKY and s not in labels["owed"]]
+        if LEVELS.index(labels["severity"]) >= LEVELS.index(floor["severity"]) and not short:
+            print(f"evidence: {found[-1] / 'evidence.md'}" + (" — read it before you push." if floor["level"] == "human" else ""), file=sys.stderr)
+            return 0
+    log = home(cfg) / "OVERRIDES.log"
+    if log.exists() and any(line.split()[1:2] == [head] for line in log.read_text().splitlines()):
+        print("evidence: pushed on the owner's override (see OVERRIDES.log).", file=sys.stderr)
+        return 0
+    print(f"this push is {floor['severity']} severity ({', '.join(floor['owed']) or 'no surface'}) and owes {floor['level']} evidence on commit {head[:8]}, "
+          f"and there is none that passes: run `evidence start`, record the cases with `evidence run`, then `evidence finish`.", file=sys.stderr)
+    return 1
+
+
+def override(a: argparse.Namespace) -> int:
+    if not sys.stdin.isatty() or input("evidence: push this commit with no evidence? Type yes: ").strip() != "yes":
+        die("an override is the owner's, at a terminal.")
+    cfg = config()
+    home(cfg).mkdir(parents=True, exist_ok=True)
+    with (home(cfg) / "OVERRIDES.log").open("a") as f:
+        f.write(f"{datetime.datetime.now().isoformat(timespec='seconds')} {git('rev-parse', 'HEAD').strip()} {a.reason}\n")
+    return 0
+
+
+def brief(_: argparse.Namespace) -> int:
+    cfg = config()
+    labels = json.loads((folder(cfg) / "labels.json").read_text())
+    print(f"""You are verifying a change you did not write. Do not edit code. Show whether it works, with evidence.
+
+Asked for: {labels.get('request', '(not recorded: ask the owner what was asked for)')}
+The change: `git diff {labels['base'][:10]}..{labels['head'][:10]}`
+{owes_text(labels)}
+
+Rules:
+- Record every case through `scripts/evidence run --case "<what it proves>" ... -- <command>`. Never type a result.
+- Call the real thing: the endpoint, the function, the command, the screen. A passing test suite is not evidence.
+- For each surface above, show one success and each failure path the change handles.
+- Choose cases from what was asked for, not from what the code happens to do.
+- Do not read the author's notes or reasoning. If something cannot be shown, say so on the page instead of skipping it.
+- Run `EVIDENCE_DRIVER="<your model>" scripts/evidence finish` at the end and report its verdict line.""")
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+    if top.returncode != 0:
+        die("not in a git repo.")
+    ap = argparse.ArgumentParser(prog="evidence", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("classify"); p.add_argument("--base")
+    p = sub.add_parser("start"); p.add_argument("--base"); p.add_argument("--slug"); p.add_argument("--request")
+    p.add_argument("--intent", choices=INTENTS); p.add_argument("--severity", choices=LEVELS)
+    p = sub.add_parser("run"); p.add_argument("--case", required=True); p.add_argument("--surface", choices=list(SURFACES)); p.add_argument("--input")
+    p.add_argument("--expect-exit", type=int); p.add_argument("--expect-status", type=int); p.add_argument("--expect-output")
+    p.add_argument("--expect-contains", action="append", default=[]); p.add_argument("--expect-not-contains", action="append", default=[])
+    p.add_argument("--before", action="store_true"); p.add_argument("--env", default="local"); p.add_argument("--read-only", action="store_true")
+    p.add_argument("--timeout", type=int, default=120); p.add_argument("command", nargs=argparse.REMAINDER)
+    p = sub.add_parser("attach"); p.add_argument("--case", required=True); p.add_argument("--surface", choices=list(SURFACES)); p.add_argument("files", nargs="+")
+    p = sub.add_parser("stitch"); p.add_argument("--out", required=True); p.add_argument("--seconds", type=float, default=2); p.add_argument("images", nargs="+")
+    p = sub.add_parser("check"); p.add_argument("--base"); p.add_argument("--config-from")
+    p = sub.add_parser("override"); p.add_argument("--reason", required=True)
+    for name in ("finish", "brief", "prune"):
+        sub.add_parser(name)
+    a = ap.parse_args(argv)
+    if a.cmd == "attach":
+        a.files = [os.path.abspath(f) for f in a.files]
+    if a.cmd == "stitch":
+        a.images, a.out = [os.path.abspath(f) for f in a.images], os.path.abspath(a.out)
+    if a.cmd == "start" and a.request:
+        a.request = os.path.abspath(a.request)
+    os.chdir(top.stdout.strip())
+    if a.cmd == "run" and a.command[:1] == ["--"]:
+        a.command = a.command[1:]
+    if a.cmd == "classify":
+        labels = classify(a.base or default_base(), config())
+        print(json.dumps(labels, indent=2) + "\n" + owes_text(labels))
+        return 0
+    if a.cmd == "prune":
+        print(f"pruned {prune(config())} media files; index rewritten.")
+        return 0
+    return {"start": start, "run": record, "attach": attach, "stitch": stitch, "finish": finish,
+            "check": check, "override": override, "brief": brief}[a.cmd](a)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

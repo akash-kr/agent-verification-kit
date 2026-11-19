@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Every commit message: the "Verified:" trailer (agent-check.toml [gates] verified).
+exec python3 "$(git rev-parse --show-toplevel)/scripts/agent-check" commit-msg "$1"
