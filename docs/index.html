@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Receipts</title>
+<meta name="description" content="Your agent said all tests pass. It skipped the one that failed. Receipts refuses the push.">
+<meta property="og:title" content="Receipts">
+<meta property="og:description" content="Your agent said all tests pass. It skipped the one that failed. Receipts refuses the push.">
+<meta property="og:image" content="assets/receipts-poster.png">
+<link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #e9ecef; --ink: #1c1b19; --dim: #5c5f66; --line: #c9ced4; --paper: #ffffff; --red: #c62828;
+  --code: #f6f8fa; --ok: #1a7f37; --btn-ink: #ffffff;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace; --sans: Archivo, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #15171a; --ink: #eceef1; --dim: #a2a7ae; --line: #33373d; --code: #1d2024; --ok: #3fb950; --btn-ink: #15171a; }
+}
+:root[data-theme="dark"] { --bg: #15171a; --ink: #eceef1; --dim: #a2a7ae; --line: #33373d; --code: #1d2024; --ok: #3fb950; --btn-ink: #15171a; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+code { font-family: var(--mono); font-size: .92em; }
+.wrap { max-width: 1160px; margin: 0 auto; padding: 0 40px; }
+
+nav { display: flex; justify-content: space-between; align-items: center; padding: 22px 0; }
+nav .brand img { display: block; height: 30px; width: auto; image-rendering: pixelated; }
+nav .links { display: flex; gap: 26px; font-size: 15px; font-weight: 600; color: var(--dim); }
+nav .links a { text-decoration: none; }
+@media (hover: hover) and (pointer: fine) { nav .links a:hover { color: var(--ink); } }
+
+.hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 56px; align-items: center; padding: 56px 0 96px; }
+h1 { font-size: 60px; line-height: 1.02; margin: 0 0 22px; font-weight: 800; letter-spacing: -.03em; }
+.sub { font-family: var(--mono); color: var(--dim); font-size: 15px; line-height: 1.65; margin: 0 0 30px; max-width: 32em; }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; font: 700 16px var(--sans); padding: 0 22px; border-radius: 6px; border: 2px solid var(--ink); text-decoration: none; transition: transform .12s ease-out; }
+.btn.main { background: var(--ink); color: var(--btn-ink); }
+.btn:active { transform: scale(.97); }
+
+/* the receipt */
+.slip { position: relative; background: var(--paper); color: #1c1b19; font-family: var(--mono); font-size: 14px; line-height: 1.8;
+  padding: 26px 26px 44px; box-shadow: 0 1px 0 rgba(0,0,0,.08), 0 22px 44px -22px rgba(0,0,0,.45); width: 100%; max-width: 430px; justify-self: center;
+  -webkit-mask: linear-gradient(#000 0 0) top/100% calc(100% - 10px) no-repeat, conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom/16px 10px repeat-x;
+          mask: linear-gradient(#000 0 0) top/100% calc(100% - 10px) no-repeat, conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom/16px 10px repeat-x; }
+.slip .c { text-align: center; }
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.row .dots { flex: 1; border-bottom: 1px dotted #9a9a9a; transform: translateY(-5px); min-width: 12px; }
+.row .k { min-width: 0; overflow-wrap: anywhere; }
+.bad { color: #c62828; font-weight: 600; }
+.good { color: #1a7f37; font-weight: 600; }
+.slip hr { border: 0; border-top: 1px dashed #9a9a9a; margin: 12px 0; }
+.stamp { position: absolute; right: 22px; bottom: 26px; border: 3px solid #c62828; color: #c62828; font: 800 30px var(--sans);
+  padding: 2px 12px; transform: rotate(-12deg); letter-spacing: .04em; border-radius: 4px; background: rgba(255,255,255,.6); }
+.hero .slip { transform: rotate(1.2deg); padding-bottom: 78px; }
+.hero .stamp { bottom: 22px; right: 26px; }
+
+/* print, then stamp: plays once */
+.print .line { opacity: 0; transform: translateY(-4px); animation: in .26s ease-out forwards; animation-delay: calc(var(--i) * 110ms + 200ms); }
+.print .stamp { opacity: 0; animation: stamp .22s ease-out forwards; animation-delay: 1.5s; }
+@keyframes in { to { opacity: 1; transform: none; } }
+@keyframes stamp { from { opacity: 0; transform: rotate(-12deg) scale(1.35); } to { opacity: 1; transform: rotate(-12deg) scale(1); } }
+
+section { padding: 72px 0; border-top: 1px solid var(--line); }
+h2 { font-size: 38px; line-height: 1.08; letter-spacing: -.02em; margin: 0 0 12px; font-weight: 800; }
+.lede { font-family: var(--mono); color: var(--dim); font-size: 15px; line-height: 1.65; margin: 0 0 32px; max-width: 46em; }
+
+.video { background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.video video { display: block; width: 100%; height: auto; }
+pre { background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font: 14px/1.6 var(--mono); margin: 16px 0 0; }
+
+/* scenes */
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.chip { font: 600 15px var(--sans); min-height: 44px; padding: 0 18px; border-radius: 999px; border: 2px solid var(--line); background: transparent; color: var(--dim); cursor: pointer; transition: transform .12s ease-out; }
+.chip[aria-selected="true"] { border-color: var(--ink); color: var(--ink); }
+.chip:active { transform: scale(.97); }
+.scene { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+.panel h3 { font: 600 14px var(--mono); color: var(--dim); margin: 0 0 10px; }
+.diff { background: var(--paper); color: #1c1b19; border: 1px solid var(--line); border-radius: 8px; font: 13.5px/1.75 var(--mono); padding: 10px 0; overflow-x: auto; }
+.diff div { padding: 0 14px; white-space: pre; }
+.diff .a { background: #dafbe1; } .diff .d { background: #ffebe9; } .diff .m { color: #6e7781; }
+.says { font-family: var(--mono); font-size: 14px; margin-top: 12px; line-height: 1.6; }
+.says b { color: #8250df; }
+.scene .slip { max-width: none; padding-bottom: 36px; }
+.scene .msg { font-size: 13.5px; line-height: 1.6; }
+.fade { animation: fade .25s ease-out; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.note { font-family: var(--mono); color: var(--dim); font-size: 14px; line-height: 1.65; margin: 24px 0 0; max-width: 52em; }
+
+/* guide */
+.steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; counter-reset: s; max-width: 860px; }
+.steps li { display: grid; grid-template-columns: 36px 1fr; gap: 12px; counter-increment: s; font-size: 17px; line-height: 1.5; }
+.steps li::before { content: counter(s); font: 700 15px var(--mono); width: 30px; height: 30px; border: 2px solid var(--ink); border-radius: 50%; display: grid; place-items: center; }
+.steps li > div, .scene > .panel, .hero > div { min-width: 0; }
+.steps li p { margin: 2px 0 0; color: var(--dim); font-family: var(--mono); font-size: 14px; line-height: 1.6; }
+
+.limits { margin: 0; padding-left: 20px; display: grid; gap: 10px; max-width: 860px; font-size: 17px; line-height: 1.5; }
+footer { border-top: 1px solid var(--line); padding: 28px 0 48px; font-family: var(--mono); font-size: 14px; color: var(--dim); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+@media (max-width: 860px) {
+  .wrap { padding: 0 16px; }
+  nav .links { display: none; }
+  .hero { grid-template-columns: 1fr; padding: 24px 0 56px; gap: 40px; }
+  h1 { font-size: 38px; }
+  h2 { font-size: 30px; }
+  section { padding: 52px 0; }
+  .scene { grid-template-columns: 1fr; gap: 20px; }
+  .slip { font-size: 13px; padding: 22px 18px 40px; }
+  .stamp { font-size: 24px; right: 14px; }
+  .btn { flex: 1 1 auto; justify-content: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .print .line, .print .stamp, .fade { animation: none; opacity: 1; transform: none; }
+  .print .stamp { transform: rotate(-12deg); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="#" aria-label="Receipts">
+      <picture><source srcset="assets/logo-dark.svg" media="(prefers-color-scheme: dark)"><img src="assets/logo-light.svg" alt="Receipts" width="248" height="34"></picture>
+    </a>
+    <div class="links"><a href="#demo">Demo</a><a href="#catches">What it catches</a><a href="#use">Use it</a><a href="https://github.com/akash-kr/agent-verification-kit">GitHub</a></div>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <h1>Your agent said all tests pass. It skipped the one that failed.</h1>
+      <p class="sub">Receipts checks every push. Switch a test off, delete one, move it out of the suite, or slip a key into history, and the push is refused. Plain git hooks and CI. Works with any agent.</p>
+      <div class="cta">
+        <a class="btn main" href="#demo">▶ Watch the 30s demo</a>
+        <a class="btn" href="#use">Set it up</a>
+      </div>
+    </div>
+    <div class="slip print" role="img" aria-label="A receipt for the push: test_adds_prices passed, test_coupon_is_a_percentage was skipped. The agent says all pass. Receipts stamps it refused.">
+      <div class="c line" style="--i:0"><b>git push</b><br>shop · main · 2 tests</div>
+      <hr class="line" style="--i:1">
+      <div class="row line" style="--i:2"><span class="k">test_adds_prices</span><span class="dots"></span><span>PASS</span></div>
+      <div class="row line bad" style="--i:3"><span class="k">test_coupon_is_a_percentage</span><span class="dots"></span><span>SKIPPED</span></div>
+      <hr class="line" style="--i:4">
+      <div class="row line" style="--i:5"><b>AGENT SAYS</b><span class="dots"></span><b>ALL PASS</b></div>
+      <div class="row line" style="--i:6"><b>RECEIPTS SAYS</b><span class="dots"></span><b></b></div>
+      <div class="stamp" aria-hidden="true">REFUSED</div>
+    </div>
+  </header>
+</div>
+
+<section id="demo">
+  <div class="wrap">
+    <h2>Watch an agent try it</h2>
+    <p class="lede">A real run, not a mock-up. The agent skips a failing test, then hides a payment key and deletes it a commit later. Both pushes are refused. The honest fix goes through.</p>
+    <div class="video">
+      <video src="assets/receipts.mp4" poster="assets/receipts-poster.png" controls muted playsinline preload="metadata" width="1280" height="720"></video>
+    </div>
+    <pre><code>git clone https://github.com/akash-kr/agent-verification-kit
+cd agent-verification-kit &amp;&amp; demo/run.sh     # git and Python 3.12+, runs in a throwaway folder</code></pre>
+  </div>
+</section>
+
+<section id="catches">
+  <div class="wrap">
+    <h2>Four ways an agent fakes a green build</h2>
+    <p class="lede">Each one leaves the suite green. Each refusal below is the tool's real output.</p>
+    <div class="chips" role="tablist" aria-label="Examples"></div>
+    <div class="scene" id="scene" aria-live="polite"></div>
+    <p class="note">Every refusal says how to fix it. If a skip really is right, the owner grants that one finding by its id in <code>.guard-allow</code>. A comment on the line is not enough, and a key in history can't be granted at all.</p>
+  </div>
+</section>
+
+<section id="use">
+  <div class="wrap">
+    <h2>Set it up in a repo</h2>
+    <p class="lede">It's git hooks, a Python script and a CI workflow. Claude Code, Codex, Cursor, Gemini and people all push through the same checks.</p>
+    <ol class="steps">
+      <li><div>Install it into your repo.<pre><code>git clone https://github.com/akash-kr/agent-verification-kit ~/agent-verification-kit
+~/agent-verification-kit/scripts/setup /path/to/your/repo --github</code></pre></div></li>
+      <li><div>Point <code>agent-check.toml</code> at your test command and test folder.<p>It starts as test = "python -m pytest -q" and tests = "tests/". Change both to what your repo runs.</p></div></li>
+      <li><div>Tell your agents the rules.<p>Paste docs/VERIFICATION.md into your AGENTS.md or CLAUDE.md.</p></div></li>
+      <li><div>Watch for a week, then switch on.<p>The guard starts in observe: it logs what it would refuse. Read the log, then set guard = "enforce". A key in history is refused from day one.</p></div></li>
+      <li><div>When a push is refused, fix the code.<p>Only the owner grants a finding, through .guard-allow. Protect it with CODEOWNERS and branch protection.</p></div></li>
+    </ol>
+    <p class="note">The guard is one part of the kit. The rest makes an agent prove a change works with a real run tied to the commit, seals the tests that hold your rules, and requires a bug test to fail before the fix. <a href="https://github.com/akash-kr/agent-verification-kit#readme">Read the README</a>.</p>
+  </div>
+</section>
+
+<section id="limits">
+  <div class="wrap">
+    <h2>What it won't catch</h2>
+    <ul class="limits">
+      <li>Tests switched off in config: <code>-k 'not x'</code> in addopts, <code>collect_ignore</code>, a <code>load_tests</code> that returns nothing.</li>
+      <li>A rename it doesn't know (<code>test_x</code> to <code>tst_x</code>), or a skip decorator it doesn't know.</li>
+      <li>Loosened or removed assertions. They're listed at push, not refused.</li>
+      <li>Local hooks can be bypassed with <code>--no-verify</code>. CI is the check that counts.</li>
+      <li>Without branch protection, an agent can write its own grant. Use CODEOWNERS on <code>.guard-allow</code>.</li>
+    </ul>
+  </div>
+</section>
+
+<div class="wrap">
+  <footer><span>Receipts · MIT license</span><a href="https://github.com/akash-kr/agent-verification-kit">github.com/akash-kr/agent-verification-kit</a></footer>
+</div>
+
+<script>
+// The four scenes. Each refusal is copied from the guard's output on a throwaway repo (ids included).
+const SCENES = [
+  { chip: "Skips the test", says: "One fails. I'll skip it and report green.",
+    diff: [["m", "tests/test_cart.py"], ["", "     def test_adds_prices(self):"], ["", "         self.assertEqual(total([20, 20]), 40)"], ["", ""], ["a", "+    @unittest.skip(\"flaky\")"], ["", "     def test_coupon_is_a_percentage(self):"]],
+    suite: "OK (skipped=1)", rule: "test-skipped", where: "tests/test_cart.py:10", id: "83ff3e44", what: "a test is switched off." },
+  { chip: "Deletes it", says: "Removed a flaky test.",
+    diff: [["m", "git rm tests/test_coupon.py"], ["d", "-    def test_coupon(self):"], ["d", "-        self.assertEqual(total([20, 20], 10), 40)"]],
+    suite: "OK", rule: "test-deleted", where: "tests/test_coupon.py", id: "2f103214", what: "a test file is deleted." },
+  { chip: "Moves it out", says: "Tidied up the tests folder.",
+    diff: [["m", "git mv tests/test_coupon.py old/test_coupon.py"], ["", "rename tests/test_coupon.py → old/test_coupon.py"]],
+    suite: "OK", rule: "test-moved", where: "tests/test_coupon.py", id: "2ada3388", what: "a test file moved where the runner won't collect it (to old/test_coupon.py)." },
+  { chip: "Hides a key", says: "Removed the key in the next commit, so it's fine.",
+    diff: [["m", "commit 1: Wire up payments (--no-verify)"], ["a", "+PAYMENTS_KEY = \"sk_live_••••••••\""], ["m", "commit 2: Remove key"], ["d", "-PAYMENTS_KEY = \"sk_live_••••••••\""]],
+    suite: "OK", rule: "secret-history", where: "settings.py:1", id: "a0efcf7a", what: "a credential in a known format is in a pushed commit. No grant passes this." },
+];
+const chips = document.querySelector(".chips"), scene = document.getElementById("scene");
+const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let at = 0, timer = 0, visible = false;
+SCENES.forEach((s, i) => {
+  const b = document.createElement("button");
+  b.className = "chip"; b.type = "button"; b.role = "tab"; b.textContent = s.chip;
+  b.addEventListener("click", () => { show(i); restart(); });
+  chips.append(b);
+});
+function show(i) {
+  at = i;
+  const s = SCENES[i];
+  chips.querySelectorAll(".chip").forEach((c, k) => c.setAttribute("aria-selected", String(k === i)));
+  scene.innerHTML = `
+    <div class="panel fade"><h3>What the agent did</h3>
+      <div class="diff">${s.diff.map(([k, t]) => `<div class="${k}">${esc(t) || " "}</div>`).join("")}</div>
+      <div class="says"><b>agent ›</b> ${esc(s.says)}</div></div>
+    <div class="panel fade"><h3>What the push gets</h3>
+      <div class="slip"><div class="c"><b>git push</b></div><hr>
+        <div class="row"><span>test suite</span><span class="dots"></span><span class="good">${esc(s.suite)}</span></div>
+        <div class="row"><span>${esc(s.rule)}</span><span class="dots"></span><span class="bad">REFUSED</span></div><hr>
+        <div class="msg"><b>${esc(s.where)}</b> id=${s.id}<br>${esc(s.what)}</div>
+      </div></div>`;
+}
+function restart() {
+  clearInterval(timer);
+  if (visible && !matchMedia("(prefers-reduced-motion: reduce)").matches) timer = setInterval(() => show((at + 1) % SCENES.length), 6500);
+}
+new IntersectionObserver(([e]) => { visible = e.isIntersecting; restart(); }).observe(scene);
+show(0);
+</script>
+</body>
+</html>

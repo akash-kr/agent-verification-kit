@@ -1,12 +1,44 @@
-# Agent Verification Kit
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
+    <img src="docs/assets/logo-light.svg" alt="Receipts" width="248">
+  </picture>
+</p>
 
-A verification harness for repos where coding agents write most of the code. Agents have to show
-evidence that a change works, and the checks that judge a change stay out of its reach.
+# Your agent said all tests pass. It skipped the one that failed.
+
+**Receipts** (the Agent Verification Kit) checks every push an agent makes. Switch a test off, delete
+one, move it out of the suite, or slip a key into history, and the push is refused, even when the suite
+is green. Agents also have to show evidence that a change works, and the checks that judge a change stay
+out of its reach.
+
+![An agent skips a failing test and the push is refused; it hides a key and deletes it a commit later, and that push is refused too; the honest fix goes through.](docs/assets/receipts.gif)
+
+That's a real run of `demo/run.sh` ([video](docs/assets/receipts.mp4)). Try it yourself. It needs git
+and Python 3.12+, and it runs in a throwaway folder:
+
+```bash
+git clone https://github.com/akash-kr/agent-verification-kit && cd agent-verification-kit && demo/run.sh
+```
+
+## What it catches
+
+Each of these leaves the suite green. The refusals are the tool's real output.
+
+| The agent… | The push gets |
+|---|---|
+| adds `@unittest.skip("flaky")` to the failing test | `[test-skipped] tests/test_cart.py:10` a test is switched off |
+| deletes `tests/test_coupon.py` | `[test-deleted] tests/test_coupon.py` a test file is deleted |
+| moves it to `old/test_coupon.py` | `[test-moved]` a test file moved where the runner won't collect it |
+| commits a key with `--no-verify`, then deletes it | `[secret-history] settings.py:1` a credential in a known format is in a pushed commit |
+
+Every refusal says how to fix it. If a skip really is right, the owner grants that one finding by its
+id in `.guard-allow`. A comment on the line is not enough, and a key in history can't be granted.
 
 It's plain git hooks, one Python script and a CI workflow. It works with any agent (Claude Code, Codex,
 Cursor, Gemini) and any human, and it needs only git, bash and Python 3.12+ (the verify skill template also uses curl and shasum; UI evidence uses agent-browser or Playwright, and ffmpeg).
 
-## What it does
+## Everything the kit does
 
 | Problem | What the kit does |
 |---|---|
@@ -27,7 +59,7 @@ Cursor, Gemini) and any human, and it needs only git, bash and Python 3.12+ (the
 ## Quick start
 
 ```bash
-git clone <this repo> ~/agent-verification-kit
+git clone https://github.com/akash-kr/agent-verification-kit ~/agent-verification-kit
 ~/agent-verification-kit/scripts/setup /path/to/your/repo --github
 ```
 
@@ -55,6 +87,8 @@ templates/               LAWS.md, agent-check.toml, git hooks, GitHub Actions, a
                          UI recipes, the classifier command
 references/              evidence, laws and seals, gates, test types, measuring reviewers
 tests/                   the kit's own tests: run each of tests/test_*.py with python3
+demo/                    run.sh, the 30-second demo; record.py and render.py rebuild its GIF and video
+docs/                    the guard spec, evidence design, and the project page (index.html, assets/)
 ```
 
 ## Limits
