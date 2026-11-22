@@ -1,0 +1,2 @@
+agent-check refused:
+- tests/test_cart.py::test_total_never_negative is sealed and no longer matches its seal: put the test back; only the owner re-seals.

@@ -1,0 +1,2 @@
+agent-check refused:
+- no .test-tmp/verify/passed from a passing run on this commit (e54cfb37, nothing uncommitted, screenshots unchanged): commit, run the real-app check, read what it shows, then push.

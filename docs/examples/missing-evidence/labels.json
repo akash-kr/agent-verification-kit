@@ -1,0 +1,18 @@
+{
+  "base": "a221d26f72525b9ee0f7beb9e8b87520e3d3c44c",
+  "head": "4b0b891b9cabd1a0abe255cb1281c004e0221bc1",
+  "surfaces": [
+    "logic"
+  ],
+  "owed": [
+    "logic"
+  ],
+  "intent": "feature",
+  "severity": "high",
+  "level": "human",
+  "by": "rules",
+  "files": 2,
+  "request": "Add 20% VAT at checkout.",
+  "verdict": "PASS",
+  "driver": "the author"
+}

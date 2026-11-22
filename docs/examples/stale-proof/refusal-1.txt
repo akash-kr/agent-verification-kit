@@ -1,0 +1,2 @@
+agent-check refused:
+- no "Verified:" trailer: say how this commit was checked, e.g. git commit --trailer "Verified: <command and result>", or "Verified: none, <why>".

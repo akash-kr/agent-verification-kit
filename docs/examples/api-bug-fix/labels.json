@@ -1,0 +1,18 @@
+{
+  "base": "c391df35d43f3b944c4973a9616710579b1d2df4",
+  "head": "ee2072baf8a4f48665100e0bd986ec36d4750a64",
+  "surfaces": [
+    "logic"
+  ],
+  "owed": [
+    "logic"
+  ],
+  "intent": "bug",
+  "severity": "low",
+  "level": "agent",
+  "by": "rules",
+  "files": 1,
+  "request": "A 10% coupon on a $40 cart charges $30. It should be $36.",
+  "verdict": "PASS",
+  "driver": "the author"
+}

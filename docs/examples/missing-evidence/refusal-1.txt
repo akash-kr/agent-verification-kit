@@ -1,0 +1,2 @@
+agent-check refused:
+- this push is high severity (logic) and owes human evidence on commit 4b0b891b, and there is none that passes: run `evidence start`, record the cases with `evidence run`, then `evidence finish`.

@@ -56,6 +56,23 @@ Cursor, Gemini) and any human, and it needs only git, bash and Python 3.12+ (the
 | Rewrites that silently change behaviour | `diff-check` runs old and new on the same inputs |
 | Rules only grow | `agent-check audit` lists what's stale |
 
+## Examples: what the agent has to show
+
+Six runs of the real kit on a tiny shop, each with the refusals and the evidence it left behind. The
+[project page](https://akash-kr.github.io/receipts/#examples) plays them; the files are in `docs/examples/`.
+
+| Example | What the agent does | What it gets | The samples |
+|---|---|---|---|
+| Bug fix | Fixes a coupon bug | An evidence page with the same request on the old code (`{"total": 30.0}`) and the fix (`{"total": 36.0}`) | [evidence page](docs/examples/api-bug-fix/evidence.md) |
+| UI change | Adds a coupon box | A recording of the real page, phone and desktop screenshots, console and network errors | [evidence page](docs/examples/ui-change/evidence.md), [recording](docs/examples/ui-change/flow-copy.mp4) |
+| Billing code | Pushes `billing/` on a green suite | Refused until it records evidence a person reads | [refusal](docs/examples/missing-evidence/refusal-1.txt), [evidence page](docs/examples/missing-evidence/evidence.md) |
+| A test that tests nothing | Adds a test with its fix | Refused twice (no logged bug, then it passes on the old code); the third test goes through | [run](docs/examples/bug-test/run.txt) |
+| A sealed test | Loosens the owner's sealed test | Refused: the test no longer matches its seal | [run](docs/examples/sealed-test/run.txt) |
+| Old proof | Edits after its last check | Refused at commit and at push until it checks this commit | [run](docs/examples/stale-proof/run.txt) |
+
+Run them with `examples/run-all.sh` (about 30 seconds); [examples/README.md](examples/README.md) has the
+details and how to remove them.
+
 ## Quick start
 
 ```bash
@@ -88,6 +105,7 @@ templates/               LAWS.md, agent-check.toml, git hooks, GitHub Actions, a
 references/              evidence, laws and seals, gates, test types, measuring reviewers
 tests/                   the kit's own tests: run each of tests/test_*.py with python3
 demo/                    run.sh, the 30-second demo; record.py and render.py rebuild its GIF and video
+examples/                six runs on a sample shop that write the samples in docs/examples/
 docs/                    the guard spec, evidence design, and the project page (index.html, assets/)
 ```
 

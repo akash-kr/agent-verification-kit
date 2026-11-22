@@ -1,0 +1,51 @@
+{
+ "api-bug-fix": [
+  "cases.jsonl",
+  "evidence.md",
+  "labels.json",
+  "passed",
+  "run.txt"
+ ],
+ "bug-test": [
+  "diff-1.txt",
+  "diff-2.txt",
+  "refusal-1.txt",
+  "refusal-2.txt",
+  "run.txt"
+ ],
+ "missing-evidence": [
+  "cases.jsonl",
+  "diff-1.txt",
+  "evidence.md",
+  "labels.json",
+  "passed",
+  "refusal-1.txt",
+  "run.txt"
+ ],
+ "sealed-test": [
+  "diff-1.txt",
+  "refusal-1.txt",
+  "run.txt"
+ ],
+ "stale-proof": [
+  "diff-1.txt",
+  "diff-2.txt",
+  "refusal-1.txt",
+  "refusal-2.txt",
+  "run.txt"
+ ],
+ "ui-change": [
+  "cases.jsonl",
+  "evidence.md",
+  "failed-requests.txt",
+  "flow-copy.mp4",
+  "labels.json",
+  "media/desktop.png",
+  "media/flow.webm",
+  "media/phone.png",
+  "page-errors.txt",
+  "passed",
+  "requests.txt",
+  "run.txt"
+ ]
+}

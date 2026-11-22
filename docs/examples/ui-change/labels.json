@@ -1,0 +1,19 @@
+{
+  "base": "44bd22925a7c36c69d4589acc650dc037b1914a5",
+  "head": "c1291591e2215c8bc85ea806db8c8044fef942a9",
+  "surfaces": [
+    "logic",
+    "ui"
+  ],
+  "owed": [
+    "ui"
+  ],
+  "intent": "feature",
+  "severity": "low",
+  "level": "agent",
+  "by": "rules",
+  "files": 2,
+  "request": "Add a coupon box to the cart page.",
+  "verdict": "PASS",
+  "driver": "the author"
+}

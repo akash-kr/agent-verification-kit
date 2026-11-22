@@ -1,0 +1,2 @@
+agent-check refused:
+- tests/test_cart.py::test_coupon passes on the old code (afa2ea11), so it tests nothing this change made true.

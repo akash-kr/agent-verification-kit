@@ -1,0 +1,19 @@
+
+▌ The bug report: "A 10% coupon on a $40 cart charges $30. It should be $36."
+  agent › Fixing the coupon in cart.py.
+
+▌ Proving it: the same request on the old code and the new code.
+  $ scripts/evidence start
+  evidence/2026-11-22-fix-coupon-is-a-percentage-ee2072baf8
+  surfaces: logic   intent: bug   severity: low   owes: agent   (by rules)
+    logic: a table of input, expected output and actual output from calling it for real
+    bug fix: run at least one case with --before, so the page shows it failing on the old code.
+  $ scripts/evidence run --case "..." --before --expect-contains '"total": 36' -- curl $EVIDENCE_URL/total?prices=20,20&coupon=10
+  PASS  a 10% coupon on a $40 cart totals $36
+  $ scripts/evidence run --case "..." --expect-status 400 -- curl $EVIDENCE_URL/total?prices=20,20&coupon=ten
+  PASS  a coupon that is not a number is refused
+  $ scripts/evidence finish
+  PASS  evidence/2026-11-22-fix-coupon-is-a-percentage-ee2072baf8/evidence.md
+  $ git push
+  evidence: evidence/2026-11-22-fix-coupon-is-a-percentage-ee2072baf8/evidence.md
+  ✓ pushed with its evidence page.

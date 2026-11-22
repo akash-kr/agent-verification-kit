@@ -1,0 +1,3 @@
+[A993C4DEF48A7EDFCF8195DBEA68DA88] GET http://127.0.0.1:55590/ (Document) 200
+[25336.2] GET http://127.0.0.1:55590/total?prices=20,20&coupon=0 (Fetch) 200
+[25336.3] GET http://127.0.0.1:55590/total?prices=20,20&coupon=10 (Fetch) 200

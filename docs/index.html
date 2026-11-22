@@ -92,6 +92,28 @@ pre { background: var(--code); border: 1px solid var(--line); border-radius: 8px
 @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .note { font-family: var(--mono); color: var(--dim); font-size: 14px; line-height: 1.65; margin: 24px 0 0; max-width: 52em; }
 
+/* examples: the run on the left, what the push carries on the right */
+.log { background: var(--paper); color: #1c1b19; border: 1px solid var(--line); border-radius: 8px; font: 13px/1.65 var(--mono); padding: 12px 14px; }
+.log div { white-space: pre-wrap; overflow-wrap: anywhere; padding-left: 1.4em; text-indent: -1.4em; }
+.log .n { color: #9a6700; font-weight: 600; margin-top: 6px; } .log .n:first-child { margin-top: 0; }
+.log .a { color: #8250df; } .log .c { color: #6e7781; } .log .ok { color: #1a7f37; } .log .bad { color: #c62828; }
+.ev .case { margin: 2px 0 10px; }
+.ev .case .row { font-weight: 600; }
+.ev .kv { display: grid; grid-template-columns: 7.5em 1fr; gap: 0 10px; font-size: 12.5px; line-height: 1.55; }
+.ev .kv span:nth-child(odd) { color: #6e7781; }
+.ev .kv span { min-width: 0; overflow-wrap: anywhere; }
+.ev .meta { font-size: 12.5px; color: #59636e; text-align: center; line-height: 1.5; }
+.ev video { display: block; width: 100%; height: auto; border: 1px solid #d0d7de; border-radius: 6px; margin: 6px 0 8px; background: #f6f7f9; }
+.ev .shots { display: grid; grid-template-columns: 1fr 2.2fr; gap: 8px; align-items: start; }
+.ev .shots a { display: block; } .ev .shots img { display: block; width: 100%; height: 190px; object-fit: cover; object-position: top; border: 1px solid #d0d7de; border-radius: 6px; }
+.ev .shots span { display: block; font-size: 11.5px; color: #6e7781; margin-top: 3px; }
+.ev .more { display: inline-block; margin-top: 6px; font-size: 13px; }
+.stamp.ok { border-color: #1a7f37; color: #1a7f37; }
+.tried { position: relative; }
+.tried .diff { padding-bottom: 58px; }
+.tried .stamp { bottom: 14px; right: 16px; font-size: 24px; }
+.panel .link { font: 13px var(--mono); color: var(--dim); margin-top: 10px; }
+
 /* guide */
 .steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; counter-reset: s; max-width: 860px; }
 .steps li { display: grid; grid-template-columns: 36px 1fr; gap: 12px; counter-increment: s; font-size: 17px; line-height: 1.5; }
@@ -109,7 +131,7 @@ footer { border-top: 1px solid var(--line); padding: 28px 0 48px; font-family: v
   h1 { font-size: 38px; }
   h2 { font-size: 30px; }
   section { padding: 52px 0; }
-  .scene { grid-template-columns: 1fr; gap: 20px; }
+  .scene, .examples-scene { grid-template-columns: 1fr; gap: 20px; }
   .slip { font-size: 13px; padding: 22px 18px 40px; }
   .stamp { font-size: 24px; right: 14px; }
   .btn { flex: 1 1 auto; justify-content: center; }
@@ -117,6 +139,7 @@ footer { border-top: 1px solid var(--line); padding: 28px 0 48px; font-family: v
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .print .line, .print .stamp, .fade { animation: none; opacity: 1; transform: none; }
+  .fade .stamp { transform: rotate(-12deg); }
   .print .stamp { transform: rotate(-12deg); }
 }
 </style>
@@ -127,7 +150,7 @@ footer { border-top: 1px solid var(--line); padding: 28px 0 48px; font-family: v
     <a class="brand" href="#" aria-label="Receipts">
       <picture><source srcset="assets/logo-dark.svg" media="(prefers-color-scheme: dark)"><img src="assets/logo-light.svg" alt="Receipts" width="248" height="34"></picture>
     </a>
-    <div class="links"><a href="#demo">Demo</a><a href="#catches">What it catches</a><a href="#use">Use it</a><a href="https://github.com/akash-kr/receipts">GitHub</a></div>
+    <div class="links"><a href="#demo">Demo</a><a href="#catches">What it catches</a><a href="#examples" id="nav-examples" hidden>Examples</a><a href="#use">Use it</a><a href="https://github.com/akash-kr/receipts">GitHub</a></div>
   </nav>
 
   <header class="hero">
@@ -171,6 +194,16 @@ cd receipts &amp;&amp; demo/run.sh     # git and Python 3.12+, runs in a throwaw
     <div class="chips" role="tablist" aria-label="Examples"></div>
     <div class="scene" id="scene" aria-live="polite"></div>
     <p class="note">Every refusal says how to fix it. If a skip really is right, the owner grants that one finding by its id in <code>.guard-allow</code>. A comment on the line is not enough, and a key in history can't be granted at all.</p>
+  </div>
+</section>
+
+<section id="examples" hidden>
+  <div class="wrap">
+    <h2>What the agent has to show</h2>
+    <p class="lede">Six runs of the real kit on a tiny shop. Everything below is read from each run's own files: its terminal, its refusals, its evidence page, its recording.</p>
+    <div class="chips" role="tablist" aria-label="Examples"></div>
+    <div class="scene examples-scene" aria-live="polite"></div>
+    <p class="note">Run them yourself: <code>examples/run-all.sh</code> (git and Python 3.12+; the UI one also needs agent-browser). Each one makes a throwaway copy of the shop and deletes it at the end.</p>
   </div>
 </section>
 
@@ -253,6 +286,113 @@ function restart() {
 }
 new IntersectionObserver(([e]) => { visible = e.isIntersecting; restart(); }).observe(scene);
 show(0);
+
+// The examples. Nothing here is typed in: each scene is built from the files examples/run-all.sh wrote
+// into docs/examples/<name>/. Without those files the section stays hidden.
+(async () => {
+  const EXAMPLES = [
+    { name: "api-bug-fix", chip: "Bug fix" },
+    { name: "ui-change", chip: "UI change" },
+    { name: "missing-evidence", chip: "Billing code" },
+    { name: "bug-test", chip: "A test that tests nothing" },
+    { name: "sealed-test", chip: "A sealed test" },
+    { name: "stale-proof", chip: "Old proof" },
+  ];
+  const REPO = "https://github.com/akash-kr/receipts/blob/main/docs/examples/";
+  const section = document.getElementById("examples");
+  const box = section.querySelector(".examples-scene"), bar = section.querySelector(".chips");
+  let index;
+  try { index = await (await fetch("examples/index.json")).json(); } catch { return; }
+  const list = EXAMPLES.filter(e => index[e.name]?.includes("run.txt"));
+  if (!list.length) return;
+  section.hidden = false;
+  document.getElementById("nav-examples").hidden = false;
+  if (location.hash === "#examples") section.scrollIntoView();  // the section was hidden when the browser tried
+
+  const cache = {};
+  const text = (name, file) => fetch(`examples/${name}/${file}`).then(r => r.ok ? r.text() : "");
+  async function load(e) {
+    if (cache[e.name]) return cache[e.name];
+    const files = index[e.name];
+    const has = f => files.includes(f);
+    const run = await text(e.name, "run.txt");
+    const labels = has("labels.json") ? JSON.parse(await text(e.name, "labels.json")) : null;
+    const cases = has("cases.jsonl") ? (await text(e.name, "cases.jsonl")).split("\n").filter(Boolean).map(l => JSON.parse(l)) : [];
+    const diffs = files.filter(f => /^diff-\d+\.txt$/.test(f)).sort();
+    const diff = diffs.length ? await text(e.name, diffs.at(-1)) : "";
+    const count = async (f, re) => has(f) ? (await text(e.name, f)).split("\n").filter(l => re.test(l)).length : null;
+    const page = has("requests.txt") ? { requests: await count("requests.txt", / \d{3}$/), failed: await count("failed-requests.txt", / [45]\d\d$/), errors: await count("page-errors.txt", /\S/) } : null;
+    return (cache[e.name] = { run, labels, cases, diff, files, page });
+  }
+
+  // the run, cut to the lines a person follows: the task, what the agent says, the commands, the results
+  function runLines(run) {
+    return run.split("\n").map(l => l.replace(/^  /, "")).map(l =>
+      l.startsWith("▌") ? ["n", l.slice(2)] : l.startsWith("agent ›") ? ["a", l] : l.startsWith("$ ") ? ["c", l]
+      : /^(PASS|RESULT: all)/.test(l) ? ["ok", l] : /^✓/.test(l) ? ["ok", l] : /refused:|^- /.test(l) ? ["bad", l]
+      : /^(FAIL|RESULT: \d)/.test(l) ? ["bad", l] : null).filter(Boolean)
+      .filter(([k, l]) => !(k === "ok" && /^PASS  evidence\//.test(l)));
+  }
+  const body = out => { const last = (out || "").trim().split("\n").at(-1) || ""; return last.startsWith("{") ? last : ""; };
+  const result = (r, fallback) => body(r.out) || (r.status ? `status ${r.status}, ` : "") + (r.unmet.length ? "does not: " + r.unmet.join("; ") : fallback);
+
+  function evidence(e, d) {
+    const L = d.labels, media = e.name + "/";
+    const caseHtml = d.cases.map(c => {
+      if (c.media) {
+        const vid = c.media.find(m => /\.(webm|mp4|mov)$/.test(m)), shots = c.media.filter(m => /\.(png|jpe?g|webp|gif)$/.test(m));
+        const copy = d.files.includes("flow-copy.mp4") ? `<source src="examples/${media}flow-copy.mp4" type="video/mp4">` : "";
+        return `<div class="case"><div class="row"><span class="k">${esc(c.case)}</span><span class="dots"></span><span class="good">${c.ok ? "PASS" : "FAIL"}</span></div>
+          ${vid ? `<video muted loop playsinline controls preload="metadata" ${matchMedia("(prefers-reduced-motion: reduce)").matches ? "" : "autoplay"}>${copy}<source src="examples/${media}media/${esc(vid)}" type="video/webm"></video>` : ""}
+          <div class="shots">${shots.sort((a, b) => a.includes("phone") ? -1 : b.includes("phone") ? 1 : 0).map(s =>
+            `<a href="examples/${media}media/${esc(s)}" target="_blank" rel="noopener"><img src="examples/${media}media/${esc(s)}" alt="${esc(s.replace(/\.\w+$/, ""))} screenshot of the cart" loading="lazy"><span>${esc(s)}</span></a>`).join("")}</div></div>`;
+      }
+      const rows = [["expected", c.expect]];
+      if (c.before) rows.push(["old code", result(c.before, "meets it")]);
+      rows.push([c.before ? "this commit" : "got", result(c.after, "meets it")]);
+      return `<div class="case"><div class="row"><span class="k">${esc(c.case)}</span><span class="dots"></span><span class="${c.ok ? "good" : "bad"}">${c.ok ? "PASS" : "FAIL"}</span></div>
+        <div class="kv">${rows.map(([k, v], i) => `<span>${k}</span><span class="${k === "old code" ? "bad" : k === "this commit" ? "good" : ""}">${esc(v)}</span>`).join("")}</div></div>`;
+    }).join("");
+    return `<div class="slip ev"><div class="c"><b>evidence</b></div>
+      <div class="meta">commit ${esc(L.head.slice(0, 8))} · ${esc(L.surfaces.join(", "))} · ${esc(L.intent)} · ${esc(L.severity)} severity · owes ${esc(L.level)} evidence</div><hr>
+      <div class="msg"><b>Asked for:</b> ${esc(L.request || "")}</div><hr>${caseHtml}<hr>
+      ${d.page ? `<div class="kv"><span>requests</span><span><a href="examples/${media}requests.txt" target="_blank" rel="noopener">${d.page.requests}</a>, <span class="${d.page.failed ? "bad" : "good"}">${d.page.failed} failed</span></span><span>page errors</span><span class="${d.page.errors ? "bad" : "good"}">${d.page.errors}</span></div><hr>` : ""}
+      <a class="more" href="${REPO}${media}evidence.md" target="_blank" rel="noopener">The full evidence page →</a>
+      <div class="stamp ok" aria-hidden="true">${esc(L.verdict)}</div></div>`;
+  }
+  function refused(d) {
+    const lines = d.diff.split("\n").filter(l => !/^(index |diff --git|new file mode)/.test(l));
+    return `<div class="tried"><div class="diff">${lines.map(l => `<div class="${/^(\+\+\+|---|@@)/.test(l) ? "m" : l.startsWith("+") ? "a" : l.startsWith("-") ? "d" : ""}">${esc(l) || " "}</div>`).join("")}</div><div class="stamp" aria-hidden="true">REFUSED</div></div>`;
+  }
+
+  let at = 0, timer = 0, seen = false, touched = false, lines = 0;
+  const stop = () => { touched = true; clearTimeout(timer); };  // once someone touches the section, it stops moving
+  ["pointerdown", "wheel", "keydown"].forEach(type => section.addEventListener(type, stop, { passive: true }));
+  list.forEach((e, i) => {
+    const b = document.createElement("button");
+    b.className = "chip"; b.type = "button"; b.role = "tab"; b.textContent = e.chip;
+    b.addEventListener("click", () => { stop(); show(i); });
+    bar.append(b);
+  });
+  async function show(i) {
+    at = i;
+    bar.querySelectorAll(".chip").forEach((c, k) => c.setAttribute("aria-selected", String(k === i)));
+    const e = list[i], d = await load(e);
+    if (at !== i) return;  // another chip was picked while this one loaded
+    const right = d.labels ? `<h3>What the push carries</h3>${evidence(e, d)}`
+      : `<h3>What the agent tried to push</h3>${refused(d)}<div class="link"><a href="${REPO}${e.name}/run.txt" target="_blank" rel="noopener">The whole run →</a></div>`;
+    const log = runLines(d.run); lines = log.length;
+    box.innerHTML = `<div class="panel fade"><h3>The run</h3><div class="log">${log.map(([k, l]) => `<div class="${k}">${esc(l)}</div>`).join("")}</div>
+      <div class="link">examples/${esc(e.name)}.sh</div></div><div class="panel fade">${right}</div>`;
+    loop();
+  }
+  const loop = () => {
+    clearTimeout(timer);  // a longer run stays up longer: about 0.7s a line, 10 to 24 seconds
+    if (seen && !touched && !matchMedia("(prefers-reduced-motion: reduce)").matches) timer = setTimeout(() => show((at + 1) % list.length), Math.min(24000, Math.max(10000, lines * 700)));
+  };
+  new IntersectionObserver(([x]) => { seen = x.isIntersecting; loop(); }).observe(box);
+  show(0);
+})();
 </script>
 </body>
 </html>

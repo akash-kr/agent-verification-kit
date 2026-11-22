@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Shop · Cart</title><link rel="icon" href="data:,">
+<style>
+body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: #f6f7f9; color: #1c1b19; }
+main { max-width: 520px; margin: 0 auto; padding: 32px 16px; }
+h1 { font-size: 28px; margin: 0 0 20px; }
+.item, .sum { display: flex; justify-content: space-between; background: #fff; border: 1px solid #dde1e6; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; }
+.sum { font-weight: 700; font-size: 20px; }
+</style></head>
+<body><main>
+<h1>Your cart</h1>
+<div class="item"><span>Notebook</span><span>$20</span></div>
+<div class="item"><span>Pen set</span><span>$20</span></div>
+<div class="sum"><span>Total</span><span id="total">…</span></div>
+</main>
+<script>
+fetch("/total?prices=20,20").then(r => r.json()).then(d => { document.getElementById("total").textContent = "$" + d.total; });
+</script>
+</body></html>

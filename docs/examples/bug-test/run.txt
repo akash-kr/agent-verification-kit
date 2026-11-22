@@ -1,0 +1,15 @@
+
+▌ The owner logged the bug in LAWS.md as B1: "A 10% coupon takes 10% off the total, not 10 dollars."
+  agent › Fixed cart.py and added a test.
+  $ git push
+  agent-check refused:
+  - tests/test_cart.py::test_coupon names no law or bug in LAWS.md (add [L<n>] or [B<n>] to it, or drop it).
+
+▌ Try two: the agent tags the test [B1], but it still checks nothing the fix changed.
+  $ git push
+  agent-check refused:
+  - tests/test_cart.py::test_coupon passes on the old code (afa2ea11), so it tests nothing this change made true.
+
+▌ Try three: a test of the bug itself. It must fail on the old code and pass on the new.
+  $ git push
+  ✓ pushed: the test names B1, fails on the old code and passes on the new.

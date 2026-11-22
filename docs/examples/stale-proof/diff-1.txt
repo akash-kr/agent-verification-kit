@@ -1,0 +1,13 @@
+diff --git a/cart.html b/cart.html
+index 6bbfe93..9650681 100644
+--- a/cart.html
++++ b/cart.html
+@@ -9,7 +9,7 @@ h1 { font-size: 28px; margin: 0 0 20px; }
+ </style></head>
+ <body><main>
+ <h1>Your cart</h1>
+-<p>2 items</p>
++<p>2 items in your cart</p>
+ <div class="item"><span>Notebook</span><span>$20</span></div>
+ <div class="item"><span>Pen set</span><span>$20</span></div>
+ <div class="sum"><span>Total</span><span id="total">…</span></div>

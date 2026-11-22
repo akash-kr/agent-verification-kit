@@ -1,0 +1,2 @@
+agent-check refused:
+- tests/test_cart.py::test_coupon names no law or bug in LAWS.md (add [L<n>] or [B<n>] to it, or drop it).

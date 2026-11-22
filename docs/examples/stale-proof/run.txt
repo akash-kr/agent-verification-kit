@@ -1,0 +1,23 @@
+
+▌ The task: "Show how many items are in the cart."
+  agent › Running the real-app check on this commit.
+  $ .claude/skills/verify/check.sh
+  PASS  the cart page loads
+  PASS  the total comes back for a $40 cart
+  RESULT: all checks passed
+  agent › One more tweak: "2 items in your cart". It is tiny, no need to check again.
+  $ git commit -m "copy: item count wording"
+  agent-check refused:
+  - no "Verified:" trailer: say how this commit was checked, e.g. git commit --trailer "Verified: <command and result>", or "Verified: none, <why>".
+  agent › Fine: "Verified: ran verify". It did run, on the commit before.
+  $ git push
+  agent-check refused:
+  - no .test-tmp/verify/passed from a passing run on this commit (e54cfb37, nothing uncommitted, screenshots unchanged): commit, run the real-app check, read what it shows, then push.
+
+▌ The honest way: run the check on the commit being pushed, and read what it says.
+  $ .claude/skills/verify/check.sh
+  PASS  the cart page loads
+  PASS  the total comes back for a $40 cart
+  RESULT: all checks passed
+  $ git push
+  ✓ pushed, with proof from a passing check on this exact commit.
