@@ -1,0 +1,3238 @@
+{
+ "cases": [
+  {
+   "name": "marker-it-skip",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/a.test.js": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/a.test.js": "it.skip('x', () => {})\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-test-only",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/a.test.js": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/a.test.js": "test.only('x', () => {})\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-describe-skip-each",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/a.test.js": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/a.test.js": "describe.skip.each([1])('x', f)\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-it-concurrent-skip",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/a.test.js": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/a.test.js": "it.concurrent.skip('x', f)\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-test-only-each",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/a.test.js": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/a.test.js": "test.only.each`a`('x', f)\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-xtest",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/a.test.js": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/a.test.js": "xtest('x', f)\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-xit",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/a.test.js": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/a.test.js": "xit('x', f)\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-self-skipTest",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "    self.skipTest('later')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-this-skip",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/a.test.js": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/a.test.js": "this.skip()\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-go-t-Skip",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "pkg/a_test.go": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "pkg/a_test.go": "t.Skip(\"flaky\")\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-go-t-Skipf",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "pkg/a_test.go": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "pkg/a_test.go": "t.Skipf(\"%s\", x)\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-go-t-SkipNow",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "pkg/a_test.go": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "pkg/a_test.go": "t.SkipNow()\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-rust-ignore",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "src/lib.rs": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "src/lib.rs": "#[ignore]\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-junit-disabled",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/FooTest.java": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/FooTest.java": "@Disabled\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-junit-ignore",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/FooTest.java": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/FooTest.java": "@Ignore\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-pytest-xfail-mark",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@pytest.mark.xfail\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-pytest-xfail-call",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "pytest.xfail('x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-unittest-expectedFailure",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@unittest.expectedFailure\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-pytest-skip-mark",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@pytest.mark.skip\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-pytest-skip-call",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "pytest.skip('off')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-unittest-skip",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@unittest.skip('x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-skipif-true",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@pytest.mark.skipif(True, reason='x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-unittest-skipIf-true",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@unittest.skipIf(True, 'x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-js-skipIf-true",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/a.test.js": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/a.test.js": "it.skipIf(true)('x', f)\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-skipif-1",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@pytest.mark.skipif(1, reason='x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-skipUnless-false",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@unittest.skipUnless(False, 'x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-raise-unittest-SkipTest",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "raise unittest.SkipTest('later')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-raise-SkipTest",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "raise SkipTest\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-raise-case-SkipTest",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "    raise unittest.case.SkipTest('x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-raise-pytest-skip-exception",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "raise pytest.skip.Exception('x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-pytest-skip-with-reason",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "    item.add_marker(pytest.mark.skip(reason='x'))\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "alias-bare-skip",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@skip('x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "alias-u-skip",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "    @u.skip('x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "alias-mark-skip",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@mark.skip\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "alias-mark-xfail",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "    @mark.xfail(reason='x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "alias-pytestmark-mark-skip",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "pytestmark = mark.skip\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "alias-pytestmark-pytest",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "pytestmark = pytest.mark.skip\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "alias-skip-comment",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@skip  # flaky\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "alias-mark-skip-comment",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "    @mark.skip  # later\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "allow-foreman-mark-skip",
+   "from": "test_detector.py::test_secrets_and_skipped_tests_without_a_model",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@pytest.mark.skip  # foreman:allow\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "allow-guard-mark-skip",
+   "from": "test_detector.py::test_a_skip_is_bound_to_the_test_it_skips",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@pytest.mark.skip  # guard:allow\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "allow-mark-js-skip",
+   "from": "test_detector.py::test_a_skip_is_bound_to_the_test_it_skips",
+   "commits": [
+    {
+     "write": {
+      "tests/a.test.js": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/a.test.js": "it.skip('x', f) // guard:allow\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "cond-new-file-skipif-platform",
+   "from": "test_detector.py::test_conditional_skip_is_fine_in_a_new_test_file_only",
+   "commits": [
+    {
+     "write": {
+      "tests/test_old.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_posix.py": "@pytest.mark.skipif(sys.platform == 'win32', reason='posix')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "cond-new-file-unittest-skipIf",
+   "from": "test_detector.py::test_conditional_skip_is_fine_in_a_new_test_file_only",
+   "commits": [
+    {
+     "write": {
+      "tests/test_old.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_posix.py": "@unittest.skipIf(IS_WINDOWS, 'x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "cond-new-file-unittest-skipUnless",
+   "from": "test_detector.py::test_conditional_skip_is_fine_in_a_new_test_file_only",
+   "commits": [
+    {
+     "write": {
+      "tests/test_old.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_posix.py": "@unittest.skipUnless(HAS_GPU, 'gpu')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "cond-new-file-pytest-skipif-name",
+   "from": "test_detector.py::test_conditional_skip_is_fine_in_a_new_test_file_only",
+   "commits": [
+    {
+     "write": {
+      "tests/test_old.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_posix.py": "@pytest.mark.skipif(TRUE_ON_CI, reason='x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "cond-new-file-importorskip",
+   "from": "test_detector.py::test_conditional_skip_is_fine_in_a_new_test_file_only",
+   "commits": [
+    {
+     "write": {
+      "tests/test_old.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_posix.py": "np = pytest.importorskip('numpy')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "cond-new-file-alias-skipIf",
+   "from": "test_detector.py::test_conditional_skip_is_fine_in_a_new_test_file_only",
+   "commits": [
+    {
+     "write": {
+      "tests/test_old.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_posix.py": "@skipIf(sys.platform == 'win32', 'x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "cond-new-file-alias-mark-skipif",
+   "from": "test_detector.py::test_conditional_skip_is_fine_in_a_new_test_file_only",
+   "commits": [
+    {
+     "write": {
+      "tests/test_old.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_posix.py": "    @mark.skipif(X, reason='x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "cond-new-file-alias-skipUnless",
+   "from": "test_detector.py::test_conditional_skip_is_fine_in_a_new_test_file_only",
+   "commits": [
+    {
+     "write": {
+      "tests/test_old.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_posix.py": "@skipUnless(HAS_GPU, 'x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "cond-existing-file-skipif-platform",
+   "from": "test_detector.py::test_conditional_skip_in_new_and_existing_test_files",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@pytest.mark.skipif(sys.platform == 'win32', reason='posix')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "cond-existing-file-unittest-skipIf",
+   "from": "test_detector.py::test_conditional_skip_in_new_and_existing_test_files",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@unittest.skipIf(IS_WINDOWS, 'x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "cond-existing-file-importorskip",
+   "from": "test_detector.py::test_conditional_skip_in_new_and_existing_test_files",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "np = pytest.importorskip('numpy')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "cond-existing-file-alias-skipIf",
+   "from": "test_detector.py::test_conditional_skip_in_new_and_existing_test_files",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@skipIf(sys.platform == 'win32', 'x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "cond-new-js-skipIf",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_old.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/b.test.js": "it.skipIf(isWindows)('x', f)\nx = 1\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "uncond-new-file-skip",
+   "from": "test_detector.py::test_conditional_skip_is_fine_in_a_new_test_file_only",
+   "commits": [
+    {
+     "write": {
+      "tests/test_old.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_new.py": "@pytest.mark.skip\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "cond-new-file-constant-true",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/test_old.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_new.py": "@pytest.mark.skipif(True, reason='x')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "fp-skipTests-var",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "skipTests = 3\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "fp-JsonIgnore",
+   "from": "test_detector.py::test_markers_switch_tests_off",
+   "commits": [
+    {
+     "write": {
+      "tests/FooTest.java": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/FooTest.java": "@JsonIgnore\nx = 1\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "fp-def-skip",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "def skip(self):\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "fp-items-skip",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "items.skip(2)\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "fp-skipper",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@skipper\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "fp-graphql-skip",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "src/query.graphql": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "src/query.graphql": "avatar @skip(if: $light)\nx = 1\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "fp-gql-template",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "src/q.ts": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "src/q.ts": "const q = gql`avatar @skip(if: $light)`\nx = 1\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "fp-skip-setter",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "    @skip.setter\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "fp-ruby-if-skip",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "lib/a.rb": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "lib/a.rb": "return if @skip\nx = 1\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "fp-perl-skip",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "lib/a.pl": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "lib/a.pl": "my @skip = qw(a b);\nx = 1\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "fp-vue-skip",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "src/A.vue": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "src/A.vue": "<Step @skip=\"next\" />\nx = 1\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "fp-email-skip-io",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "EMAIL = 'ops@skip'\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "fp-skip-if-no-gpu",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@skip_if_no_gpu\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "fp-parametrize",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@mark.parametrize('x', [1])\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "fp-fixture",
+   "from": "test_detector.py::test_python_only_on_a_decorator_line",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@pytest.fixture\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "docs-readme-marker",
+   "from": "test_detector.py::test_documentation_only_names_markers",
+   "commits": [
+    {
+     "write": {
+      "README.md": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "README.md": "Use this.skip() or @Disabled sparingly.\nx = 1\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "docs-rst-marker",
+   "from": "test_detector.py::test_documentation_only_names_markers",
+   "commits": [
+    {
+     "write": {
+      "docs/guide.rst": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "docs/guide.rst": "Do not use @pytest.mark.skip here.\nx = 1\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "docs-txt-marker",
+   "from": "test_detector.py::test_documentation_only_names_markers",
+   "commits": [
+    {
+     "write": {
+      "notes.txt": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "notes.txt": "it.skip('x', f)\nx = 1\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "docs-md-in-tests",
+   "from": "test_detector.py::test_documentation_only_names_markers",
+   "commits": [
+    {
+     "write": {
+      "tests/README.md": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/README.md": "@pytest.mark.skip\nx = 1\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "docs-test-js-this-skip",
+   "from": "test_detector.py::test_documentation_only_names_markers",
+   "commits": [
+    {
+     "write": {
+      "tests/a.test.js": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/a.test.js": "this.skip()\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "outside-regex-string",
+   "from": "test_detector.py::test_outside_test_files_only_a_marker_written_as_code_counts",
+   "commits": [
+    {
+     "write": {
+      "plugin/detector.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "plugin/detector.py": "r\"@unittest\\.(?:skip|expectedFailure)\\b\",\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "outside-printf-shell",
+   "from": "test_detector.py::test_outside_test_files_only_a_marker_written_as_code_counts",
+   "commits": [
+    {
+     "write": {
+      "scripts/battery.sh": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "scripts/battery.sh": "printf '@unittest.skip(\"x\")\\n' > tests/test_a.py\nx = 1\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "outside-hash-comment",
+   "from": "test_detector.py::test_outside_test_files_only_a_marker_written_as_code_counts",
+   "commits": [
+    {
+     "write": {
+      "app/c.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "app/c.py": "x = 1  # never use @unittest.skip here\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "outside-slash-comment",
+   "from": "test_detector.py::test_outside_test_files_only_a_marker_written_as_code_counts",
+   "commits": [
+    {
+     "write": {
+      "src/util.js": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "src/util.js": "// avoid it.skip('x', f) in CI\nx = 1\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "outside-helper-code",
+   "from": "test_detector.py::test_outside_test_files_only_a_marker_written_as_code_counts",
+   "commits": [
+    {
+     "write": {
+      "app/helpers.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "app/helpers.py": "skip_slow = pytest.mark.skip(reason='slow')\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "outside-rust-ignore",
+   "from": "test_detector.py::test_outside_test_files_only_a_marker_written_as_code_counts",
+   "commits": [
+    {
+     "write": {
+      "src/lib.rs": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "src/lib.rs": "    #[ignore]\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "outside-js-it-skip",
+   "from": "test_detector.py::test_outside_test_files_only_a_marker_written_as_code_counts",
+   "commits": [
+    {
+     "write": {
+      "src/util.js": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "src/util.js": "it.skip('x', () => {})\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "test-file-quoted-marker",
+   "from": "test_detector.py::test_outside_test_files_only_a_marker_written_as_code_counts",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "'@unittest.skip'\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "outside-floor-div-then-marker",
+   "from": "test_detector.py::test_outside_test_files_only_a_marker_written_as_code_counts",
+   "commits": [
+    {
+     "write": {
+      "app/helpers.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "app/helpers.py": "n = total // 2; pytestmark = pytest.mark.skip\ndef test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "ci-quoted-sed",
+   "from": "test_detector.py::test_outside_test_files_only_a_marker_written_as_code_counts",
+   "commits": [
+    {
+     "write": {
+      ".github/workflows/ci.yml": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      ".github/workflows/ci.yml": "run: sed -i 's/def test_x/@pytest.mark.skip\\ndef test_x/' tests/test_a.py\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "makefile-quoted-sed",
+   "from": "test_detector.py::test_outside_test_files_only_a_marker_written_as_code_counts",
+   "commits": [
+    {
+     "write": {
+      "Makefile": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "Makefile": "\tsed -i 's/def test_x/@pytest.mark.skip/' tests/test_a.py\nx = 1\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "added-line-plus-plus-not-header",
+   "from": "test_detector.py::test_an_added_line_starting_with_plus_plus_is_not_a_header",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": [
+       "++ not/a/header.py",
+       "@pytest.mark.skip",
+       "def test_x():",
+       "    assert True"
+      ]
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "unicode-test-path-skip",
+   "from": "test_detector.py::test_worktree_includes_untracked_files_and_unicode_paths",
+   "commits": [
+    {
+     "write": {
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_ñandú.py": "@pytest.mark.skip\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "clean-change-passes",
+   "from": "test_detector.py::test_cli_exit_status",
+   "commits": [
+    {
+     "write": {
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "app.py": "x = 2\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "skip-in-new-test-file-no-base-test",
+   "from": "test_detector.py::test_branch_base_with_a_local_main_only",
+   "commits": [
+    {
+     "write": {
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_a.py": "@pytest.mark.skip\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "rename-disable-py-prefix-_",
+   "from": "test_detector.py::test_python_go_and_js_renames",
+   "commits": [
+    {
+     "write": {
+      "tests/test_calc.py": "class T:\n    def test_adds(self):\n        pass\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_calc.py": "class T:\n    def _test_adds(self):\n        pass\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "rename-disable-py-prefix-x",
+   "from": "test_detector.py::test_python_go_and_js_renames",
+   "commits": [
+    {
+     "write": {
+      "tests/test_calc.py": "class T:\n    def test_adds(self):\n        pass\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_calc.py": "class T:\n    def xtest_adds(self):\n        pass\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "rename-disable-py-prefix-disabled_",
+   "from": "test_detector.py::test_python_go_and_js_renames",
+   "commits": [
+    {
+     "write": {
+      "tests/test_calc.py": "class T:\n    def test_adds(self):\n        pass\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_calc.py": "class T:\n    def disabled_test_adds(self):\n        pass\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "rename-disable-py-prefix-skip_",
+   "from": "test_detector.py::test_python_go_and_js_renames",
+   "commits": [
+    {
+     "write": {
+      "tests/test_calc.py": "class T:\n    def test_adds(self):\n        pass\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_calc.py": "class T:\n    def skip_test_adds(self):\n        pass\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "rename-disable-go-lowercase",
+   "from": "test_detector.py::test_python_go_and_js_renames",
+   "commits": [
+    {
+     "write": {
+      "pkg/calc_test.go": "func TestAdd(t *testing.T) {\n}\n"
+     }
+    },
+    {
+     "write": {
+      "pkg/calc_test.go": "func testAdd(t *testing.T) {\n}\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "rename-disable-go-underscore",
+   "from": "test_detector.py::test_python_go_and_js_renames",
+   "commits": [
+    {
+     "write": {
+      "pkg/calc_test.go": "func TestAdd(t *testing.T) {\n}\n"
+     }
+    },
+    {
+     "write": {
+      "pkg/calc_test.go": "func _TestAdd(t *testing.T) {\n}\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "rename-disable-js-todo",
+   "from": "test_detector.py::test_python_go_and_js_renames",
+   "commits": [
+    {
+     "write": {
+      "src/calc.test.js": "it('adds', () => {\n});\n"
+     }
+    },
+    {
+     "write": {
+      "src/calc.test.js": "it.todo('adds', () => {\n});\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "rename-disable-py-class",
+   "from": "test_detector.py::test_a_test_class_renamed_out_of_collection",
+   "commits": [
+    {
+     "write": {
+      "tests/test_calc.py": "class TestCalc(unittest.TestCase):\n    pass\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_calc.py": "class _TestCalc(unittest.TestCase):\n    pass\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "rename-disable-real-change",
+   "from": "test_detector.py::test_a_rename_in_a_real_change_blocks",
+   "commits": [
+    {
+     "write": {
+      "tests/test_calc.py": "import unittest\n\n\nclass T(unittest.TestCase):\n    def test_adds(self):\n        pass\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_calc.py": "import unittest\n\n\nclass T(unittest.TestCase):\n    def _test_adds(self):\n        pass\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "rename-fp-still-collected",
+   "from": "test_detector.py::test_what_is_not_a_disabling_rename",
+   "commits": [
+    {
+     "write": {
+      "tests/test_calc.py": "class T:\n    def test_adds(self):\n        pass\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_calc.py": "class T:\n    def test_adds_numbers(self):\n        pass\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "rename-fp-helper-added-original-kept",
+   "from": "test_detector.py::test_what_is_not_a_disabling_rename",
+   "commits": [
+    {
+     "write": {
+      "tests/test_calc.py": "class T:\n    def test_adds(self):\n        pass\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_calc.py": "class T:\n    def _test_adds_helper(self):\n        pass\n    def test_adds(self):\n        pass\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "rename-fp-outside-tests",
+   "from": "test_detector.py::test_what_is_not_a_disabling_rename",
+   "commits": [
+    {
+     "write": {
+      "app/calc.py": "def test_adds():\n    pass\n"
+     }
+    },
+    {
+     "write": {
+      "app/calc.py": "def _test_adds():\n    pass\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "rename-fp-js-concurrent",
+   "from": "test_detector.py::test_what_is_not_a_disabling_rename",
+   "commits": [
+    {
+     "write": {
+      "src/calc.test.js": "it('adds', () => {\n});\n"
+     }
+    },
+    {
+     "write": {
+      "src/calc.test.js": "it.concurrent('adds', () => {\n});\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "rename-js-xit-one-finding",
+   "from": "test_detector.py::test_what_is_not_a_disabling_rename",
+   "commits": [
+    {
+     "write": {
+      "src/calc.test.js": "it('adds', () => {\n});\n"
+     }
+    },
+    {
+     "write": {
+      "src/calc.test.js": "xit('adds', () => {\n});\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "rename-fp-make-test-data",
+   "from": "test_detector.py::test_what_is_not_a_disabling_rename",
+   "commits": [
+    {
+     "write": {
+      "tests/test_calc.py": "def test_data():\n    pass\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_calc.py": "def make_test_data():\n    pass\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "rename-fp-js-check-call",
+   "from": "test_detector.py::test_what_is_not_a_disabling_rename",
+   "commits": [
+    {
+     "write": {
+      "src/calc.test.js": "it('adds', () => {\n});\n"
+     }
+    },
+    {
+     "write": {
+      "src/calc.test.js": "check('adds', () => {\n});\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "delete-test-tests-test_a.py",
+   "from": "test_detector.py::test_only_test_code_counts",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "x = 1\n",
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "delete": [
+      "tests/test_a.py"
+     ]
+    }
+   ],
+   "expect": [
+    "test-deleted"
+   ]
+  },
+  {
+   "name": "delete-test-src-a.test.ts",
+   "from": "test_detector.py::test_only_test_code_counts",
+   "commits": [
+    {
+     "write": {
+      "src/a.test.ts": "x = 1\n",
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "delete": [
+      "src/a.test.ts"
+     ]
+    }
+   ],
+   "expect": [
+    "test-deleted"
+   ]
+  },
+  {
+   "name": "delete-test-pkg-a_test.go",
+   "from": "test_detector.py::test_only_test_code_counts",
+   "commits": [
+    {
+     "write": {
+      "pkg/a_test.go": "x = 1\n",
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "delete": [
+      "pkg/a_test.go"
+     ]
+    }
+   ],
+   "expect": [
+    "test-deleted"
+   ]
+  },
+  {
+   "name": "delete-test-spec-models-user_spec.rb",
+   "from": "test_detector.py::test_only_test_code_counts",
+   "commits": [
+    {
+     "write": {
+      "spec/models/user_spec.rb": "x = 1\n",
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "delete": [
+      "spec/models/user_spec.rb"
+     ]
+    }
+   ],
+   "expect": [
+    "test-deleted"
+   ]
+  },
+  {
+   "name": "delete-fp-tests-__snapshots__-a.test.ts.snap",
+   "from": "test_detector.py::test_only_test_code_counts",
+   "commits": [
+    {
+     "write": {
+      "tests/__snapshots__/a.test.ts.snap": "x\n",
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "delete": [
+      "tests/__snapshots__/a.test.ts.snap"
+     ]
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "delete-fp-tests-fixtures-user.py",
+   "from": "test_detector.py::test_only_test_code_counts",
+   "commits": [
+    {
+     "write": {
+      "tests/fixtures/user.py": "x\n",
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "delete": [
+      "tests/fixtures/user.py"
+     ]
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "delete-fp-tests-data.json",
+   "from": "test_detector.py::test_only_test_code_counts",
+   "commits": [
+    {
+     "write": {
+      "tests/data.json": "x\n",
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "delete": [
+      "tests/data.json"
+     ]
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "delete-fp-tests-testdata-input.txt",
+   "from": "test_detector.py::test_only_test_code_counts",
+   "commits": [
+    {
+     "write": {
+      "tests/testdata/input.txt": "x\n",
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "delete": [
+      "tests/testdata/input.txt"
+     ]
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "delete-fp-tests-README.md",
+   "from": "test_detector.py::test_only_test_code_counts",
+   "commits": [
+    {
+     "write": {
+      "tests/README.md": "x\n",
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "delete": [
+      "tests/README.md"
+     ]
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "delete-fp-app-code",
+   "from": "test_detector.py::test_secrets_and_skipped_tests_without_a_model",
+   "commits": [
+    {
+     "write": {
+      "app/old.py": "x = 1\n"
+     }
+    },
+    {
+     "delete": [
+      "app/old.py"
+     ]
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "delete-test-and-app-code",
+   "from": "test_detector.py::test_secrets_and_skipped_tests_without_a_model",
+   "commits": [
+    {
+     "write": {
+      "app/old.py": "x = 1\n",
+      "tests/test_old.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "delete": [
+      "app/old.py",
+      "tests/test_old.py"
+     ]
+    }
+   ],
+   "expect": [
+    "test-deleted"
+   ]
+  },
+  {
+   "name": "delete-fp-pycache",
+   "from": "test_detector.py::test_python_cache_is_not_a_test",
+   "commits": [
+    {
+     "write": {
+      "tests/__pycache__/test_x.cpython-39.pyc": "x\n",
+      "tests/old.pyc": "x\n",
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "delete": [
+      "tests/__pycache__/test_x.cpython-39.pyc",
+      "tests/old.pyc"
+     ]
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "delete-test-x-py-alongside-pyc",
+   "from": "test_detector.py::test_python_cache_is_not_a_test",
+   "commits": [
+    {
+     "write": {
+      "tests/__pycache__/test_x.cpython-39.pyc": "x\n",
+      "tests/test_x.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "delete": [
+      "tests/__pycache__/test_x.cpython-39.pyc",
+      "tests/test_x.py"
+     ]
+    }
+   ],
+   "expect": [
+    "test-deleted"
+   ]
+  },
+  {
+   "name": "delete-test-and-add-unrelated",
+   "from": "test_detector.py::test_branch_against_its_base",
+   "commits": [
+    {
+     "write": {
+      "tests/test_app.py": "def test_x():\n    assert True\n",
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "delete": [
+      "tests/test_app.py"
+     ],
+     "write": {
+      "tests/test_other.py": "VALUE = 42\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-deleted"
+   ]
+  },
+  {
+   "name": "delete-with-allow-message-style-file",
+   "from": "test_detector.py::test_renames_and_commit_message_allowances",
+   "commits": [
+    {
+     "write": {
+      "tests/test_old.py": "def test_x():\n    assert True\n",
+      "tests/test_new.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "delete": [
+      "tests/test_old.py"
+     ]
+    }
+   ],
+   "expect": [
+    "test-deleted"
+   ]
+  },
+  {
+   "name": "move-tests-test_a.py-to-tests-a_check.py",
+   "from": "test_detector.py::test_a_test_renamed_inside_the_tests_to_a_name_the_runner_skips",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "rename": [
+      [
+       "tests/test_a.py",
+       "tests/a_check.py"
+      ]
+     ]
+    }
+   ],
+   "expect": [
+    "test-moved"
+   ]
+  },
+  {
+   "name": "move-tests-test_a.py-to-tests-test_a.py.bak",
+   "from": "test_detector.py::test_a_test_renamed_inside_the_tests_to_a_name_the_runner_skips",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "rename": [
+      [
+       "tests/test_a.py",
+       "tests/test_a.py.bak"
+      ]
+     ]
+    }
+   ],
+   "expect": [
+    "test-moved"
+   ]
+  },
+  {
+   "name": "move-tests-test_a.py-to-tests-test_a.txt",
+   "from": "test_detector.py::test_a_test_renamed_inside_the_tests_to_a_name_the_runner_skips",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "rename": [
+      [
+       "tests/test_a.py",
+       "tests/test_a.txt"
+      ]
+     ]
+    }
+   ],
+   "expect": [
+    "test-moved"
+   ]
+  },
+  {
+   "name": "move-src-a.test.ts-to-src-a.ts.off",
+   "from": "test_detector.py::test_a_test_renamed_inside_the_tests_to_a_name_the_runner_skips",
+   "commits": [
+    {
+     "write": {
+      "src/a.test.ts": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "rename": [
+      [
+       "src/a.test.ts",
+       "src/a.ts.off"
+      ]
+     ]
+    }
+   ],
+   "expect": [
+    "test-moved"
+   ]
+  },
+  {
+   "name": "move-pkg-a_test.go-to-pkg-a_check.go",
+   "from": "test_detector.py::test_a_test_renamed_inside_the_tests_to_a_name_the_runner_skips",
+   "commits": [
+    {
+     "write": {
+      "pkg/a_test.go": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "rename": [
+      [
+       "pkg/a_test.go",
+       "pkg/a_check.go"
+      ]
+     ]
+    }
+   ],
+   "expect": [
+    "test-moved"
+   ]
+  },
+  {
+   "name": "move-tests-test_x.py-to-archive-x.py",
+   "from": "test_detector.py::test_renames_and_commit_message_allowances",
+   "commits": [
+    {
+     "write": {
+      "tests/test_x.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "rename": [
+      [
+       "tests/test_x.py",
+       "archive/x.py"
+      ]
+     ]
+    }
+   ],
+   "expect": [
+    "test-moved"
+   ]
+  },
+  {
+   "name": "move-fp-tests-test_a.py-to-tests-test_b.py",
+   "from": "test_detector.py::test_a_test_renamed_inside_the_tests_to_a_name_the_runner_skips",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "rename": [
+      [
+       "tests/test_a.py",
+       "tests/test_b.py"
+      ]
+     ]
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "move-fp-tests-test_a.py-to-tests-unit-test_a.py",
+   "from": "test_detector.py::test_a_test_renamed_inside_the_tests_to_a_name_the_runner_skips",
+   "commits": [
+    {
+     "write": {
+      "tests/test_a.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "rename": [
+      [
+       "tests/test_a.py",
+       "tests/unit/test_a.py"
+      ]
+     ]
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "move-fp-src-a.test.ts-to-src-b.test.ts",
+   "from": "test_detector.py::test_a_test_renamed_inside_the_tests_to_a_name_the_runner_skips",
+   "commits": [
+    {
+     "write": {
+      "src/a.test.ts": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "rename": [
+      [
+       "src/a.test.ts",
+       "src/b.test.ts"
+      ]
+     ]
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "move-fp-tests-helpers.py-to-tests-utils.py",
+   "from": "test_detector.py::test_a_test_renamed_inside_the_tests_to_a_name_the_runner_skips",
+   "commits": [
+    {
+     "write": {
+      "tests/helpers.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "rename": [
+      [
+       "tests/helpers.py",
+       "tests/utils.py"
+      ]
+     ]
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "move-fp-src-test-java-FooTest.java-to-src-test-java-FooIT.java",
+   "from": "test_detector.py::test_a_test_renamed_inside_the_tests_to_a_name_the_runner_skips",
+   "commits": [
+    {
+     "write": {
+      "src/test/java/FooTest.java": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "rename": [
+      [
+       "src/test/java/FooTest.java",
+       "src/test/java/FooIT.java"
+      ]
+     ]
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "move-fp-src-test-java-FooTest.java-to-src-test-java-FooTestCase.java",
+   "from": "test_detector.py::test_a_test_renamed_inside_the_tests_to_a_name_the_runner_skips",
+   "commits": [
+    {
+     "write": {
+      "src/test/java/FooTest.java": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "rename": [
+      [
+       "src/test/java/FooTest.java",
+       "src/test/java/FooTestCase.java"
+      ]
+     ]
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "move-fp-tests-test_x.py-to-tests-test_y.py",
+   "from": "test_detector.py::test_a_test_renamed_inside_the_tests_to_a_name_the_runner_skips",
+   "commits": [
+    {
+     "write": {
+      "tests/test_x.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "rename": [
+      [
+       "tests/test_x.py",
+       "tests/test_y.py"
+      ]
+     ]
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "move-to-archive-with-edit",
+   "from": "test_detector.py::test_file_findings_are_bound_to_the_new_content",
+   "commits": [
+    {
+     "write": {
+      "tests/test_x.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "rename": [
+      [
+       "tests/test_x.py",
+       "archive/x.py"
+      ]
+     ],
+     "write": {
+      "archive/x.py": "def test_x():\n    assert True\n# edited\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-moved"
+   ]
+  },
+  {
+   "name": "history-added-and-removed",
+   "from": "test_detector.py::test_history",
+   "commits": [
+    {
+     "write": {
+      "app/c.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "app/c.py": "K = '{{github}}'\n"
+     }
+    },
+    {
+     "write": {
+      "app/c.py": "x = 2\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-present-at-head",
+   "from": "test_detector.py::test_bound_to_rule_file_and_content_not_line_number",
+   "commits": [
+    {
+     "write": {
+      "app/c.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "app/c.py": "x = 1  # {{github}}\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-in-test-file",
+   "from": "test_detector.py::test_real_formats_count_in_tests_but_guesses_do_not",
+   "commits": [
+    {
+     "write": {
+      "tests/test_x.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_x.py": "def test_x():\n    assert True\nK = '{{github}}'\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-test-file-removed-later",
+   "from": "test_detector.py::test_real_formats_count_in_tests_but_guesses_do_not",
+   "commits": [
+    {
+     "write": {
+      "tests/test_x.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_x.py": "def test_x():\n    assert True\nK = '{{github}}'\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_x.py": "def test_x():\n    assert True\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-in-env-file",
+   "from": "test_detector.py::test_env_files",
+   "commits": [
+    {
+     "write": {
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      ".env": "# {{github}}\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-in-env-removed-later",
+   "from": "test_detector.py::test_history",
+   "commits": [
+    {
+     "write": {
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      ".env": "# {{github}}\n"
+     }
+    },
+    {
+     "delete": [
+      ".env"
+     ]
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-marked-line-not-allowed",
+   "from": "test_detector.py::test_secrets_and_skipped_tests_without_a_model",
+   "commits": [
+    {
+     "write": {
+      "app/x.py": "context = 1\n"
+     }
+    },
+    {
+     "write": {
+      "app/x.py": "context = 1\nok = 1  # {{github}} foreman:allow\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-guard-allow-mark",
+   "from": "test_detector.py::test_secrets_and_skipped_tests_without_a_model",
+   "commits": [
+    {
+     "write": {
+      "app/x.py": "context = 1\n"
+     }
+    },
+    {
+     "write": {
+      "app/x.py": "context = 1\nok = 1  # {{aws}} guard:allow\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-in-quoted-unicode-path",
+   "from": "test_detector.py::test_quoted_paths",
+   "commits": [
+    {
+     "write": {
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "config/producción.yaml": "key: '{{github}}'\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-private-key",
+   "from": "test_detector.py::test_private_key",
+   "commits": [
+    {
+     "write": {
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "k": "{{private_key}}\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-private-key-in-test",
+   "from": "test_detector.py::test_private_key",
+   "commits": [
+    {
+     "write": {
+      "tests/test_k.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_k.py": "def test_x():\n    assert True\nKEY = '''{{private_key}}'''\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-aws",
+   "from": "test_detector.py::test_current_credential_formats",
+   "commits": [
+    {
+     "write": {
+      "deploy/up.sh": "echo up\n"
+     }
+    },
+    {
+     "write": {
+      "deploy/up.sh": "echo up\nexport AWS_ACCESS_KEY_ID={{aws}}\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-openai",
+   "from": "test_detector.py::test_current_credential_formats",
+   "commits": [
+    {
+     "write": {
+      "app/llm.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "app/llm.py": "x = 1\nKEY = '{{openai}}'\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-slack",
+   "from": "test_detector.py::test_current_credential_formats",
+   "commits": [
+    {
+     "write": {
+      "app/notify.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "app/notify.py": "x = 1\nTOKEN = '{{slack}}'\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-google",
+   "from": "test_detector.py::test_current_credential_formats",
+   "commits": [
+    {
+     "write": {
+      "src/firebase.js": "const a = 1;\n"
+     }
+    },
+    {
+     "write": {
+      "src/firebase.js": "const a = 1;\nconst k = '{{google}}';\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-stripe",
+   "from": "test_detector.py::test_current_credential_formats",
+   "commits": [
+    {
+     "write": {
+      "src/pay.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "src/pay.py": "x = 1\nSTRIPE = '{{stripe}}'\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-stripe-removed-later",
+   "from": "test_detector.py::test_current_credential_formats",
+   "commits": [
+    {
+     "write": {
+      "src/pay.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "src/pay.py": "STRIPE = '{{stripe}}'\n"
+     }
+    },
+    {
+     "write": {
+      "src/pay.py": "x = 3\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-aws-in-test-file",
+   "from": "test_detector.py::test_current_credential_formats",
+   "commits": [
+    {
+     "write": {
+      "tests/test_aws.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_aws.py": "def test_x():\n    assert True\nAWS = '{{aws}}'\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "history-secret-and-skip-same-file",
+   "from": "test_detector.py::test_history_secret_survives_other_findings",
+   "commits": [
+    {
+     "write": {
+      "tests/t.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "tests/t.py": "@pytest.mark.skip\ndef test_x():\n    assert True\nK = '{{github}}'\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history",
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "history-secret-then-delete-test",
+   "from": "test_detector.py::test_branch_against_its_base",
+   "commits": [
+    {
+     "write": {
+      "app.py": "x = 1\n",
+      "tests/test_app.py": "def test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "app.py": "K = '{{github}}'\n"
+     }
+    },
+    {
+     "write": {
+      "app.py": "x = 2\n",
+      "tests/test_other.py": "VALUE = 42\n"
+     },
+     "delete": [
+      "tests/test_app.py"
+     ]
+    }
+   ],
+   "expect": [
+    "secret-history",
+    "test-deleted"
+   ]
+  },
+  {
+   "name": "history-secret-and-skip-two-commits",
+   "from": "test_detector.py::test_branch_against_its_base",
+   "commits": [
+    {
+     "write": {
+      "tests/test_app.py": "def test_x():\n    assert True\n",
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_app.py": "@pytest.mark.skip\ndef test_x():\n    assert True\n"
+     }
+    },
+    {
+     "write": {
+      "app.py": "K = '{{github}}'\n"
+     }
+    },
+    {
+     "write": {
+      "app.py": "x = 2\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history",
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "history-fp-environ-lookup",
+   "from": "test_detector.py::test_no_false_positives",
+   "commits": [
+    {
+     "write": {
+      "scripts/tool": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "scripts/tool": "token = os.environ['TOKEN']\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "history-fp-slack-docs-example",
+   "from": "test_detector.py::test_no_false_positives",
+   "commits": [
+    {
+     "write": {
+      "backup.env.example": "A=\n"
+     }
+    },
+    {
+     "write": {
+      "backup.env.example": "WEBHOOK=https://hooks.slack.com/services/T000/B000/XXXXXXXXXXXXXXXXXXXXXXXX\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "history-fp-made-up-in-test",
+   "from": "test_detector.py::test_made_up_values_in_a_test_diff",
+   "commits": [
+    {
+     "write": {
+      "app/tests/bearer.unit.test.ts": "export {};\n"
+     }
+    },
+    {
+     "write": {
+      "app/tests/bearer.unit.test.ts": "export {};\nAPP_AUTH_SECRET: \"synthetic-x\",\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "history-fp-clean-change",
+   "from": "test_detector.py::test_cli_exit_status",
+   "commits": [
+    {
+     "write": {
+      "app.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "app.py": "x = 2\n"
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "binary-attribute-hides-history-secret",
+   "from": "review of the guard, 2026-11-22",
+   "commits": [
+    {
+     "write": {
+      "a.txt": "x\n"
+     }
+    },
+    {
+     "write": {
+      ".gitattributes": "config.dat binary\n",
+      "config.dat": "K={{github}}\n"
+     }
+    },
+    {
+     "write": {
+      "config.dat": "x\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "nul-byte-hides-history-secret",
+   "from": "review of the guard, 2026-11-22",
+   "commits": [
+    {
+     "write": {
+      "a.txt": "x\n"
+     }
+    },
+    {
+     "write": {
+      "blob.bin": "K={{aws}}\n\u0000\n"
+     }
+    },
+    {
+     "write": {
+      "blob.bin": "x\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "no-diff-attribute-hides-skip",
+   "from": "review of the guard, 2026-11-22",
+   "commits": [
+    {
+     "write": {
+      "tests/test_x.py": "import unittest\n\n\nclass T(unittest.TestCase):\n    def test_one(self):\n        pass\n"
+     }
+    },
+    {
+     "write": {
+      ".gitattributes": "tests/*.py -diff\n",
+      "tests/test_x.py": "import unittest\n\n\nclass T(unittest.TestCase):\n    @unittest.skip('x')\n    def test_one(self):\n        pass\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "plus-plus-line-hides-history-secret",
+   "from": "review of the guard, 2026-11-22",
+   "commits": [
+    {
+     "write": {
+      "a.txt": "x\n"
+     }
+    },
+    {
+     "write": {
+      "c.txt": "++ {{github}}\n"
+     }
+    },
+    {
+     "write": {
+      "c.txt": "x\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "plus-plus-header-line-hides-skip",
+   "from": "review of the guard, 2026-11-22",
+   "commits": [
+    {
+     "write": {
+      "tests/test_x.py": "import unittest\n\n\nclass T(unittest.TestCase):\n    def test_one(self):\n        pass\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_x.py": "import unittest\n\n\nclass T(unittest.TestCase):\n    \"\"\"\n++ b/notes.md\n    \"\"\"\n    @unittest.skip('x')\n    def test_one(self):\n        pass\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "carriage-return-hides-history-secret",
+   "from": "review of the guard, 2026-11-22",
+   "commits": [
+    {
+     "write": {
+      "a.txt": "x\n"
+     }
+    },
+    {
+     "write": {
+      "c.py": "x = 1\rK = '{{github}}'\n"
+     }
+    },
+    {
+     "write": {
+      "c.py": "x = 2\n"
+     }
+    }
+   ],
+   "expect": [
+    "secret-history"
+   ]
+  },
+  {
+   "name": "form-feed-hides-skip",
+   "from": "review of the guard, 2026-11-22",
+   "commits": [
+    {
+     "write": {
+      "tests/test_x.py": "import unittest\n\n\nclass T(unittest.TestCase):\n    def test_one(self):\n        pass\n"
+     }
+    },
+    {
+     "write": {
+      "tests/test_x.py": "import unittest\n\n\nclass T(unittest.TestCase):\n    y = 1\f    @unittest.skip('x')\n    def test_one(self):\n        pass\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  }
+ ]
+}

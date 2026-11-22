@@ -5,6 +5,8 @@
 /.sealed-tests             @owner
 /agent-check.toml          @owner
 /scripts/agent-check       @owner
+/scripts/guard             @owner
+/.guard-allow              @owner
 /.githooks/                @owner
 /.github/                  @owner
 /.claude/skills/verify/    @owner

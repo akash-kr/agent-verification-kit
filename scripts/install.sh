@@ -29,6 +29,7 @@ put "$kit/scripts/agent-check" scripts/agent-check
 put "$kit/scripts/review-eval" scripts/review-eval
 put "$kit/scripts/diff-check" scripts/diff-check
 put "$kit/scripts/evidence" scripts/evidence
+put "$kit/scripts/guard" scripts/guard
 put "$kit/templates/classifier.sh" scripts/evidence-classifier
 for recipe in "$kit"/templates/ui-recipes/*; do put "$recipe" ".claude/skills/verify/ui/$(basename "$recipe")"; done
 put "$kit/templates/agent-check.toml" agent-check.toml
@@ -46,7 +47,7 @@ if [ "$github" = 1 ]; then
   put "$kit/templates/ci/github-check.yml" .github/workflows/agent-check.yml
   put "$kit/templates/CODEOWNERS" .github/CODEOWNERS
 fi
-chmod +x scripts/agent-check scripts/review-eval scripts/diff-check scripts/evidence scripts/evidence-classifier .githooks/* .claude/skills/verify/check.sh
+chmod +x scripts/agent-check scripts/guard scripts/review-eval scripts/diff-check scripts/evidence scripts/evidence-classifier .githooks/* .claude/skills/verify/check.sh
 
 current="$(git config core.hooksPath || true)"
 existing="$(find .git/hooks -type f ! -name '*.sample' 2>/dev/null | tr '\n' ' ')"

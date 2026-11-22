@@ -1,0 +1,481 @@
+#!/usr/bin/env python3
+"""guard: did this change rig the check? Refuses a test switched off, deleted or moved out of the runner's
+reach, and a known-format credential in any commit of the range, even one a later commit removed.
+
+  guard --base <sha> [--head <rev>] [--tests <folder>] [--json]
+                    check <sha>..<head> (head defaults to HEAD; --base empty checks the whole history).
+                    Exit 0 clean, 1 findings, 2 could not inspect. Findings granted in .guard-allow at
+                    <head> are left out; secret-history is never granted. --tests names the folder the
+                    runner collects, so a test file moved out of it counts as moved out of reach.
+  guard replay <dir>
+                    run the cases in <dir>/cases.json, each in a throwaway repo, and print the misses.
+
+agent-check push calls it and applies the guard gate (off, observe, enforce) to the test rules;
+secret-history refuses in every mode. Rules and patterns are ported from Foreman (github.com/PedValme/foreman,
+MIT, commit 2335331, plugin/foreman/detector.py) and rewritten for this kit: a mark on a line never passes on
+its own, only an owner's grant in .guard-allow does. See docs/guard-spec.md.
+"""
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+GRANTS = ".guard-allow"
+
+# A path holding tests (Foreman L51). Python's generated files are never tests.
+TEST_PATH = re.compile(
+    r"^(?!(?:.*/)?__pycache__/)(?!.*\.py[co]$).*?(?:(^|/)(tests?|__tests__|e2e|spec)/|(_test|\.test|\.spec)\.[A-Za-z]+$|"
+    r"(^|/)(test_[^/]+\.py|conftest\.py)$)")
+# Deleting or moving these counts as deleting a test; snapshots, data and fixtures do not (Foreman L131-137).
+TEST_CODE = re.compile(r"(?i)\.(py|pyw|js|jsx|mjs|cjs|ts|tsx|mts|cts|go|rs|java|kt|kts|scala|groovy|rb|php|cs|fs|vb|"
+                       r"swift|m|mm|c|cc|cpp|cxx|h|hpp|ex|exs|erl|clj|cljs|dart|lua|pl|r|jl|sh|bash|bats|ps1|vue|"
+                       r"svelte|feature)$")
+COLLECTED_NAME = re.compile(r"(^|/)(test_[^/]+\.py|[^/]+_test\.(py|go|rb|exs)|[^/]+\.(test|spec)\.[A-Za-z]+|"
+                            r"[^/]*(?:Tests?|IT|TestCase)\.(java|kt|scala|groovy|cs|fs|vb|swift)|[^/]+_spec\.rb)$")
+NOT_TEST_CODE = re.compile(r"(?i)(^|/)(fixtures?|__fixtures__|__snapshots__|snapshots|testdata|__mocks__)/")
+DOCS = re.compile(r"(?i)\.(md|markdown|rst|txt|adoc)$")
+
+# Credential formats only: they count everywhere, tests included (Foreman L56). Guesses stay with agent-check commit.
+SECRET_FORMATS = tuple(re.compile(x) for x in (
+    r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----",
+    r"\bAKIA[0-9A-Z]{16}\b",
+    r"\bgh[pousr]_[A-Za-z0-9]{36,}",
+    r"\bgithub_pat_[A-Za-z0-9_]{40,}",
+    r"\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{24,}",
+    r"\bxox[abprs]-[A-Za-z0-9-]{10,}",
+    r"\bAIza[0-9A-Za-z_-]{35}",
+    r"\b[rs]k_live_[0-9A-Za-z]{20,}",
+    r"\bgl(?:pat|rt|dt|ptt)-[0-9A-Za-z_-]{20,}",
+    r"\bnpm_[A-Za-z0-9]{36}\b",
+    r"\bsb_secret_[0-9A-Za-z_-]{20,}", r"\bwhsec_[0-9A-Za-z+/=]{24,}", r"\bxapp-\d-[A-Za-z0-9-]{20,}",
+    r"https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/(?!X+\b)[A-Za-z0-9]{20,}",  # XXXX is the docs example
+))
+
+# Markers that switch a test off (Foreman L105-125), for pytest, unittest, Jest, Vitest, Mocha, Jasmine, Go, Rust, JUnit.
+SKIPPED_TEST = tuple(re.compile(x) for x in (
+    r"\b(?:it|test|describe|context)(?:\.concurrent)?\.(?:skip|only)(?:\.each)?\s*[(`]",
+    r"\b(?:xit|xtest|xdescribe|fit|fdescribe)\s*\(",
+    r"\bpytest\.mark\.(?:skip|xfail)\b", r"\bpytest\.(?:skip|xfail)\s*\(",
+    r"@unittest\.(?:skip|expectedFailure)\b", r"\bself\.skipTest\s*\(",
+    r"\braise\s+(?:unittest\.(?:case\.)?)?SkipTest\b",
+    r"\braise\s+(?:pytest\.)?skip\.Exception\b",
+    r"\bthis\.skip\s*\(\s*\)",
+    r"\bt\.Skip(?:f|Now)?\s*\(",
+    r"#\[ignore\b",
+    r"@(?:Disabled|Ignore)\b",
+    r"\b(?:skipif|skipIf)\s*\(\s*(?:True|true|1)\s*[,)]", r"\bskipUnless\s*\(\s*(?:False|false|0)\s*[,)]",
+))
+CONDITIONAL_SKIP = tuple(re.compile(x) for x in (
+    r"\bpytest\.mark\.skipif\b", r"@unittest\.skip(?:If|Unless)\b",
+    r"\b(?:it|test|describe)(?:\.concurrent)?\.skipIf\s*\(",
+    r"\bimportorskip\s*\(",
+))
+# Python only, on a decorator line: an imported or aliased skip, or a module marked whole (Foreman L338-341).
+PY_ALIAS_SKIP = re.compile(r"^\s*@(?:\w+\.)*(?:skip|xfail|expectedFailure)\s*(?:\(|#|$)")
+PY_ALIAS_CONDITIONAL = re.compile(r"^\s*@(?:\w+\.)*(?:skipif|skipIf|skipUnless)\s*\(")
+PY_MODULE_SKIP = re.compile(r"^\s*pytestmark\s*=.*\bmark\.(?:skip|xfail)\b(?!if)")
+PY_FILE = re.compile(r"(?i)\.pyw?$")
+# Outside test files a marker counts only as code; in the files that run the check it counts as written (L319-335).
+_QUOTED = re.compile(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'')
+_COMMENT = re.compile(r"(?:^|\s)(?:#(?!\[)|//).*$")
+_HASH_COMMENT = re.compile(r"(?:^|\s)#(?!\[).*$")
+CHECK_SURFACE = re.compile(r"(?i)(^|/)(\.github/|\.gitlab-ci\.ya?ml$|\.circleci/|azure-pipelines\.ya?ml$|Jenkinsfile$|"
+                           r"(GNU)?makefile$|[^/]*\.mk$|tox\.ini$|noxfile\.py$|package\.json$|justfile$|Taskfile\.ya?ml$)")
+
+# A test renamed so the runner stops collecting it (Foreman L557-659).
+_PY_TEST_DEF = re.compile(r"^\s*(?:async\s+)?(?:def|class)\s+(\w+)\s*[(:]")
+_GO_TEST_FUNC = re.compile(r"^\s*func\s+(\w+)\s*\(")
+_GO_COLLECTED = re.compile(r"^Test(?:[A-Z_0-9]|$)")
+_JS_TEST_CALL = re.compile(r"^(\s*)([\w.$]+)(\s*\(\s*['\"`].*)$")
+_DISABLING_PREFIX = re.compile(r"^(?:_+|[xX]+_?|_*(?:disabled?|skip(?:ped)?|todo|broken|off|no|ignored?|tmp|old|"
+                               r"wip|fixme|pending|dont)_*)$", re.I)
+_JS_DISABLING_CALLEE = re.compile(r"^(?:_+\w*|[xX]\w+|\w+\.(?:todo|skip\w*))$")
+
+GRANT_FIX = "if it is right, the owner adds `{id}  # <reason>` to " + GRANTS + " (a mark on the line is not enough)."
+RULES = {
+    "test-skipped": ("a test is switched off", "remove the marker and fix the code under test; " + GRANT_FIX),
+    "test-deleted": ("a test file is deleted", "restore it and fix the code it tests; " + GRANT_FIX),
+    "test-moved": ("a test file moved where the runner won't collect it", "move it back; " + GRANT_FIX),
+    "secret-history": ("a credential in a known format is in a pushed commit",
+                       "rotate it, then rewrite the branch so no commit holds it (a later deleting commit is not enough). No grant passes this."),
+}
+EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+
+class CannotInspect(Exception):
+    pass
+
+
+def git(*args: str, cwd: str | Path = ".") -> str:
+    pinned = ["-c", "core.hooksPath=/dev/null", "-c", "color.ui=never", "-c", "core.quotePath=false",
+              "-c", "diff.noprefix=false", "-c", "diff.mnemonicPrefix=false", "-c", "diff.relative=false",
+              "-c", "diff.renames=true", "-c", "diff.suppressBlankEmpty=false", "-c", "log.showRoot=true"]
+    run = subprocess.run(["git", *pinned, *args], cwd=cwd, capture_output=True)  # bytes: text mode reads a lone \r as a line break
+    if run.returncode != 0:
+        raise CannotInspect(f"git {' '.join(args)} failed: {run.stderr.decode(errors='replace').strip()}")
+    return run.stdout.decode(errors="replace")
+
+
+def norm(text: str) -> str:
+    return " ".join((text or "").split())
+
+
+def finding_id(rule: str, path: str, content: str = "", following: str = "", version: str = "") -> str:
+    """Bound to what the finding covers, never to a line number: a grant survives an edit elsewhere in the file
+    and dies with any change to the line (and the test under it) or to the file it names."""
+    raw = "\0".join((rule, path, norm(content), norm(following), version))
+    return hashlib.sha256(raw.encode()).hexdigest()[:8]
+
+
+def is_test_path(path: str) -> bool:
+    return bool(TEST_PATH.search(path.replace("\\", "/")))
+
+
+def is_test_code(path: str) -> bool:
+    path = path.replace("\\", "/")
+    return bool(TEST_PATH.search(path) and TEST_CODE.search(path) and not NOT_TEST_CODE.search(path))
+
+
+def skip_kind(text: str, path: str) -> str | None:
+    """"skip" for a marker that switches a test off, "conditional" for a conditional skip, else None."""
+    if DOCS.search(path):
+        return None
+    if not is_test_path(path) and not CHECK_SURFACE.search(path):
+        comment = _HASH_COMMENT if PY_FILE.search(path) else _COMMENT
+        text = comment.sub("", _QUOTED.sub('""', text))
+    if any(r.search(text) for r in SKIPPED_TEST):
+        return "skip"
+    if any(r.search(text) for r in CONDITIONAL_SKIP):
+        return "conditional"
+    if PY_FILE.search(path):
+        if PY_ALIAS_SKIP.match(text) or PY_MODULE_SKIP.match(text):
+            return "skip"
+        if PY_ALIAS_CONDITIONAL.match(text):
+            return "conditional"
+    return None
+
+
+HUNK = re.compile(r"^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+
+
+def hunks(patch: str):
+    """Yield (commit, path, new line number or 0, "+"/"-"/" ", text) for each line of a patch (`git diff`, or
+    `git log -p` with a \\x01<sha> line per commit). Lines split on \\n only, and a hunk ends when its counts are
+    used up, so no added line can pass for a header and no header can hide an added line."""
+    commit, path, new, old_left, new_left = "", "", 0, 0, 0
+    for line in patch.split("\n"):
+        if old_left > 0 or new_left > 0:
+            sign, text = line[:1], line[1:]
+            if sign == "\\":  # "\\ No newline at end of file"
+                continue
+            if sign in ("+", " "):
+                new_left -= 1
+                yield commit, path, new, sign, text
+                new += 1
+            if sign in ("-", " "):
+                old_left -= 1
+                if sign == "-":
+                    yield commit, path, 0, "-", text
+            if sign not in ("+", "-", " "):
+                old_left = new_left = 0  # malformed: drop the hunk rather than misread what follows
+            continue
+        if line.startswith("\x01"):
+            commit, path = line[1:], ""
+        elif line.startswith("diff --git "):
+            path = ""
+        elif line.startswith("+++ "):
+            path = "" if line[4:].strip() == "/dev/null" else (line[6:] if line.startswith("+++ b/") else line[4:]).rstrip("\t")
+        elif m := HUNK.match(line):
+            old_left = int(m.group(1) or 1)
+            new, new_left = int(m.group(2)), int(m.group(3) or 1)
+
+
+def test_definitions(lines: list[str]):
+    py, go, js = set(), set(), {}
+    for line in lines:
+        m = _PY_TEST_DEF.match(line)
+        if m and m.group(1).lower().startswith("test"):
+            py.add(m.group(1))
+        m = _GO_TEST_FUNC.match(line)
+        if m and _GO_COLLECTED.match(m.group(1)):
+            go.add(m.group(1))
+        m = _JS_TEST_CALL.match(line)
+        if m and m.group(2) in ("it", "test"):
+            js[(m.group(1) + m.group(3)).strip()] = m.group(2)
+    return py, go, js
+
+
+def renamed_from(name: str, removed: dict) -> str:
+    """The removed test that `name` re-adds under a disabling prefix (`_test_x` for `test_x`), else ""."""
+    probe = name.lower()
+    if probe in removed:
+        return removed[probe]
+    start = probe.find("test", 1)
+    while start > 0:
+        if probe[start:] in removed and _DISABLING_PREFIX.match(name[:start]):
+            return removed[probe[start:]]
+        start = probe.find("test", start + 1)
+    return ""
+
+
+def disabled_by_rename(path: str, removed, line: str) -> str:
+    py, go, js = removed
+    m = _PY_TEST_DEF.match(line)
+    if m and py and not m.group(1).lower().startswith("test") and (old := renamed_from(m.group(1), py)):
+        return old
+    m = _GO_TEST_FUNC.match(line)
+    if m and go and path.endswith("_test.go") and not _GO_COLLECTED.match(m.group(1)) and (old := renamed_from(m.group(1), go)):
+        return old
+    m = _JS_TEST_CALL.match(line)
+    if m and js:
+        key = (m.group(1) + m.group(3)).strip()
+        if key in js and _JS_DISABLING_CALLEE.match(m.group(2)):
+            return f"{js[key]}({key.split('(', 1)[1][:60]}"
+    return ""
+
+
+_DEFINITION = re.compile(r"^\s*(?:(?:pub(?:\(\w+\))?\s+)?(?:async\s+)?(?:def|class|fn|func)\s+\w|"
+                         r"[\w.$]+\s*\(\s*['\"`]|(?:(?:public|private|protected|static|final|override|suspend)\s+)*"
+                         r"(?:void|fun)\s+\w+\s*\()")
+_ANNOTATION = re.compile(r"^\s*(?:@|#\[)")
+_COMMENT_LINE = re.compile(r"^\s*(?:#(?!\[)|//|/\*|\*)")
+
+
+def _past(lines: list[str], j: int) -> int:
+    """The index just after the bracketed construct that starts on line j (at most 10 lines)."""
+    depth, start = 0, j
+    while j < len(lines) and j < start + 10:
+        depth += sum(lines[j].count(c) for c in "([{") - sum(lines[j].count(c) for c in ")]}")
+        j += 1
+        if depth <= 0:
+            break
+    return j
+
+
+def covered(lines: list[str], n: int) -> str:
+    """The test a finding at line n (1-based) covers, with the definitions around it. For a decorator: the
+    line it decorates, past the rest of the decorator, comments and other decorators. For a call that names
+    its test on the lines below (`it.skip(` then the name): those lines. Then the definitions it sits in."""
+    i = n - 1
+    if not 0 <= i < len(lines):
+        return ""
+    if _ANNOTATION.match(lines[i]):
+        j = _past(lines, i)
+        while j < len(lines) and (not lines[j].strip() or _COMMENT_LINE.match(lines[j]) or _ANNOTATION.match(lines[j])):
+            j = _past(lines, j) if _ANNOTATION.match(lines[j]) else j + 1
+        if j >= len(lines):
+            return ""
+        anchor, own = j, [lines[j]]
+    else:
+        anchor = i
+        own = [] if _DEFINITION.match(lines[i]) else [t for t in lines[i + 1:min(_past(lines, i), i + 3)] if t.strip()]
+    chain, indent = [], len(lines[anchor]) - len(lines[anchor].lstrip())
+    for j in range(anchor - 1, -1, -1):
+        here = len(lines[j]) - len(lines[j].lstrip())
+        if lines[j].strip() and here < indent and _DEFINITION.match(lines[j]):
+            chain.append(lines[j])
+            indent = here
+    return " / ".join(norm(c) for c in [*reversed(chain), *own])
+
+
+def file_changes(base: str, head: str):
+    """(deleted paths, renames as (old, new), added paths) between base and head."""
+    out = git("diff", "--name-status", "-M", "-z", base, head).split("\0")
+    deleted, renamed, added = [], [], set()
+    i = 0
+    while i < len(out) - 1:
+        status = out[i]
+        if status.startswith(("R", "C")):
+            if status.startswith("R"):
+                renamed.append((out[i + 1], out[i + 2]))
+            else:
+                added.add(out[i + 2])
+            i += 3
+            continue
+        if status == "D":
+            deleted.append(out[i + 1])
+        elif status == "A":
+            added.add(out[i + 1])
+        i += 2
+    return deleted, renamed, added
+
+
+def blob(head: str, path: str) -> str:
+    try:
+        return git("rev-parse", f"{head}:{path}").strip()
+    except CannotInspect:
+        return ""
+
+
+def scan(base: str, head: str = "HEAD", tests: str = "") -> list[dict]:
+    """Every finding in base..head, before grants. `tests` is the folder the runner collects (agent-check.toml's
+    `tests`): a test file that leaves it is out of the runner's reach even if its name still looks like a test."""
+    found: list[dict] = []
+
+    def add(rule, path, line, detail="", content="", following="", version="", commit=""):
+        what, fix = RULES[rule]
+        fid = finding_id(rule, path, content, following, version)
+        found.append({"rule": rule, "path": path, "line": line, "id": fid, "commit": commit,
+                      "what": what + (f" ({detail})" if detail else ""), "fix": fix.format(id=fid)})
+
+    deleted, renamed, added = file_changes(base, head)
+    # --text: a file git would call binary (by its content or a pushed .gitattributes) still shows its lines
+    rows = list(hunks(git("diff", "-M", "-U3", "--text", "--no-color", "--no-ext-diff", "--no-textconv", base, head)))
+    removed_by_path: dict[str, list[str]] = {}
+    new_side: dict[str, list[tuple[int, str, str]]] = {}  # added and context lines, in order
+    for _, path, n, sign, text in rows:
+        if sign == "-":
+            removed_by_path.setdefault(path, []).append(text)
+        elif path:
+            new_side.setdefault(path, []).append((n, sign, text))
+    at_head: dict[str, list[str]] = {}
+
+    def following(path, n):  # the test the finding covers, read from the file as pushed
+        if path not in at_head:
+            at_head[path] = git("show", f"{head}:{path}").split("\n")
+        return covered(at_head[path], n)
+
+    for path, lines in new_side.items():
+        flagged = set()
+        for i, (n, sign, text) in enumerate(lines):
+            if sign != "+":
+                continue
+            kind = skip_kind(text, path)
+            if kind == "skip" or (kind == "conditional" and path not in added):
+                add("test-skipped", path, n, content=text, following=following(path, n))
+                flagged.add(n)
+        if is_test_path(path) and path in removed_by_path:  # a test renamed out of collection
+            py, go, js = test_definitions(removed_by_path[path])
+            spy, sgo, sjs = test_definitions([t for _, s, t in lines if s == "+"])
+            net = ({p.lower(): p for p in py - spy}, {g.lower(): g for g in go - sgo},
+                   {k: v for k, v in js.items() if k not in sjs})
+            if any(net):
+                for i, (n, sign, text) in enumerate(lines):
+                    if sign == "+" and n not in flagged and (old := disabled_by_rename(path, net, text)):
+                        add("test-skipped", path, n, f"renamed from `{old}`, so the runner no longer collects it",
+                            content=text, following=following(path, n))
+
+    for path in deleted:
+        if is_test_code(path):
+            add("test-deleted", path, 0, version="deleted")
+    for old, new in renamed:
+        if is_test_code(old) and (not TEST_PATH.search(new) or (tests and old.startswith(tests) and not new.startswith(tests)) or (
+                COLLECTED_NAME.search(old) and not (is_test_code(new) and COLLECTED_NAME.search(new)))):
+            add("test-moved", old, 0, f"to {new}", version=f"{new}@{blob(head, new)}")
+
+    # Every commit's own patch, merges against each parent, so a credential removed later is still seen.
+    log_range = head if base == EMPTY_TREE else f"{base}..{head}"
+    seen = set()
+    history = git("log", "-p", "-m", "--root", "--text", "--no-color", "--no-ext-diff", "--no-textconv", "--format=%x01%H", log_range)
+    for commit, path, n, sign, text in hunks(history):
+        if sign == "+" and (path, text) not in seen and any(r.search(text) for r in SECRET_FORMATS):
+            seen.add((path, text))
+            add("secret-history", path, n, f"commit {commit[:8]}", content=text, commit=commit)
+    commit = ""  # commit messages are history too
+    for text in git("log", "--format=%x01%H%n%B", log_range).split("\n"):
+        if text.startswith("\x01"):
+            commit = text[1:]
+        elif ("message", text) not in seen and any(r.search(text) for r in SECRET_FORMATS):
+            seen.add(("message", text))
+            add("secret-history", f"commit message of {commit[:8]}", 0, content=text, commit=commit)
+    return found
+
+
+def grants(head: str) -> set[str]:
+    try:
+        text = git("show", f"{head}:{GRANTS}")
+    except CannotInspect:
+        return set()
+    return {m.group(1) for m in re.finditer(r"^\s*([0-9a-f]{8})\b", text, re.M)}
+
+
+def line(f: dict) -> str:
+    where = f"{f['path']}:{f['line']}" if f["line"] else f["path"]
+    return f"[{f['rule']}] {where} id={f['id']} — {f['what']}. Fix: {f['fix']}"
+
+
+def check(base: str, head: str = "HEAD", tests: str = "") -> list[dict]:
+    """Findings in base..head that no grant covers (secret-history is never granted)."""
+    allowed = grants(head)
+    return [f for f in scan(base, head, tests) if f["rule"] == "secret-history" or f["id"] not in allowed]
+
+
+# ── replay: Foreman's detector cases, rewritten to this kit's rules ──────────
+
+TOKENS = {  # built by concatenation, so no file in this kit holds a credential
+    "github": "gh" + "p_" + "A1b2C3d4E5" * 4,
+    "aws": "AK" + "IA" + "QWERTYUIOPASDFGH",
+    "openai": "sk-" + "proj-" + "Zx9Yw8Vu7Ts6Rq5Po4Nm3Lk2",
+    "slack": "xo" + "xb-" + "1234567890-abcdefghij",
+    "google": "AI" + "za" + "SyA1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q",
+    "stripe": "sk" + "_live_" + "A1b2C3d4E5f6G7h8I9j0K1",
+    "private_key": "-----BEGIN " + "OPENSSH PRIVATE KEY-----",
+}
+
+
+def replay(folder: str) -> int:
+    cases = json.loads((Path(folder) / "cases.json").read_text())["cases"]
+    misses = 0
+    for case in cases:
+        with tempfile.TemporaryDirectory() as tmp:
+            for cmd in (["init", "-q", "-b", "main"], ["config", "user.email", "replay@example.com"],
+                        ["config", "user.name", "replay"], ["config", "commit.gpgsign", "false"]):
+                git(*cmd, cwd=tmp)
+            base = ""
+            for step in case["commits"]:
+                for old, new in step.get("rename", []):
+                    Path(tmp, new).parent.mkdir(parents=True, exist_ok=True)
+                    git("mv", old, new, cwd=tmp)
+                for path in step.get("delete", []):
+                    git("rm", "-q", path, cwd=tmp)
+                for path, text in step.get("write", {}).items():
+                    text = "\n".join(text) + "\n" if isinstance(text, list) else text  # lines, for content a JSON string escapes awkwardly
+                    for name, token in TOKENS.items():
+                        text = text.replace("{{" + name + "}}", token)
+                    Path(tmp, path).parent.mkdir(parents=True, exist_ok=True)
+                    Path(tmp, path).write_text(text)
+                git("add", "-A", cwd=tmp)
+                git("commit", "-q", "--allow-empty", "--no-verify", "-m", "step", cwd=tmp)
+                base = base or git("rev-parse", "HEAD", cwd=tmp).strip()
+            here = os.getcwd()
+            os.chdir(tmp)
+            try:
+                got = sorted({f["rule"] for f in check(base)})
+            finally:
+                os.chdir(here)
+        want = sorted(set(case["expect"]))
+        if got != want:
+            misses += 1
+            print(f"MISS {case['name']}: expected {want or 'pass'}, got {got or 'pass'}  ({case.get('from', '')})")
+    print(f"guard replay: {len(cases) - misses}/{len(cases)} cases as expected.")
+    return 1 if misses else 0
+
+
+def main(argv: list[str]) -> int:
+    if argv[:1] == ["replay"] and len(argv) == 2:
+        return replay(argv[1])
+    if not argv or argv[0] in ("-h", "--help") or "--base" not in argv:
+        print(__doc__)
+        return 0 if argv and argv[0] in ("-h", "--help") else 2
+    base = argv[argv.index("--base") + 1]
+    head = argv[argv.index("--head") + 1] if "--head" in argv else "HEAD"
+    tests = argv[argv.index("--tests") + 1] if "--tests" in argv else ""
+    try:
+        base = EMPTY_TREE if base == "empty" else git("rev-parse", "--verify", f"{base}^{{commit}}").strip()
+        found = check(base, head, tests)
+    except Exception as e:  # anything unexpected is "could not inspect", never a clean result
+        print(f"guard: could not inspect: {type(e).__name__}: {e}", file=sys.stderr)
+        return 2
+    if "--json" in argv:
+        print(json.dumps(found))
+    else:
+        print("\n".join(line(f) for f in found), file=sys.stderr) if found else None
+    return 1 if found else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

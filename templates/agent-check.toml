@@ -9,7 +9,7 @@ tests = "tests/"
 # fresh = [".test-tmp/verify/passed"]
 
 # A commit staging one of these prints "fresh review suggested".
-review = ["migrations/", "auth/", "billing/", ".github/", ".githooks/", "scripts/", ".claude/skills/verify/", "agent-check.toml", "LAWS.md", ".sealed-tests"]
+review = ["migrations/", "auth/", "billing/", ".github/", ".githooks/", "scripts/", ".claude/skills/verify/", "agent-check.toml", "LAWS.md", ".sealed-tests", ".guard-allow"]
 
 # Fixtures and helpers that sealed tests lean on: a push changing one warns.
 seal_support = ["tests/conftest.py", "tests/fixtures/"]
@@ -22,6 +22,7 @@ laws = "observe"
 red_first = "observe"
 seals = "enforce"
 verified = "observe"   # stamps "Verified: none" on commits that do not say how they were checked
+guard = "observe"      # a test switched off, deleted or moved out of tests/ (scripts/guard); a credential in any pushed commit always refuses
 evidence = "observe"   # a push whose severity owes evidence needs a passing evidence folder for this commit
 
 # Evidence by change type (scripts/evidence --help). Each push is labelled by surface, intent and

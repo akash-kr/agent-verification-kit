@@ -9,6 +9,7 @@ laws = "observe"       # every new test names a law
 red_first = "observe"  # a bug test fails on the old code
 seals = "enforce"      # sealed tests do not change
 verified = "observe"   # a "Verified:" trailer on every commit
+guard = "observe"      # no test switched off, deleted or moved out of tests/ (scripts/guard)
 ```
 
 - **off** skips the gate.
@@ -17,7 +18,8 @@ verified = "observe"   # a "Verified:" trailer on every commit
   `git log` can find it.
 - **enforce** refuses.
 
-These always enforce, whatever the config: a credential in the diff, an untracked file beside a staged
+These always enforce, whatever the config: a credential in the diff or in any pushed commit (guard's
+`secret-history`, which no grant passes), an untracked file beside a staged
 one, a push behind upstream, uncommitted files at push, and a failing suite.
 
 Roll out a gate in this order: observe for a week, read the log, fix each false positive (in the check,
@@ -47,6 +49,7 @@ evidence. `agent-check audit` lists the last 30 days of commits that had none.
 | LAWS.md | shown at every commit and push; owner-only by rule |
 | The checker and its config, in CI | `git show $BASE:scripts/agent-check` and `--config-from $BASE`: the base commit judges the PR |
 | The CI workflow file, `LAWS.md`, `.sealed-tests` | **not covered by the checker**: the workflow runs from the pushed commit and the laws are read from it. Use branch protection with the CODEOWNERS file `install.sh --github` adds, and read every change to them |
+| Guard grants (`.guard-allow`) | read from the pushed commit, so held like `LAWS.md`: CODEOWNERS and branch protection. A grant names one finding id, which changes with the line, the test under it or the file |
 | Evidence (`evidence` gate) | severity is recomputed from paths and the base's config, and the proof hashes the page; local only, see `references/evidence.md` |
 | Local hooks | run from the working tree; a local user can always bypass them. CI is the gate that counts |
 

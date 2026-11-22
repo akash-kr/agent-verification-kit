@@ -47,8 +47,10 @@ End-to-end tests of real flows first, then property tests for invariants, then d
 
 ## Gates (references/gates.md)
 
-`[gates]` in `agent-check.toml` sets `fresh`, `laws`, `red_first`, `seals`, `verified` and `evidence`
-to off, observe or enforce. Observe logs to `.git/agent-check-observe.log` without blocking. CI runs the base commit's checker and config; CODEOWNERS guards `LAWS.md` and the seals.
+`[gates]` in `agent-check.toml` sets `fresh`, `laws`, `red_first`, `seals`, `verified`, `evidence` and
+`guard` to off, observe or enforce. `guard` (`scripts/guard`) refuses a test switched off, deleted or moved
+out of `tests`; only the owner's line `<id>  # reason` in `.guard-allow` passes one finding, never a mark on
+the line. A credential in any pushed commit always refuses. Observe logs to `.git/agent-check-observe.log` without blocking. CI runs the base commit's checker and config; CODEOWNERS guards `LAWS.md` and the seals.
 
 ## Learning (references/measuring-reviewers.md)
 

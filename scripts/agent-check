@@ -38,9 +38,9 @@ Optional:
   review = [prefixes] a commit staging one prints "fresh review suggested".
   seal_support = [prefixes]  fixtures and helpers sealed tests use; a push changing one warns.
   [[question]] paths = [prefixes], ask = "<question>"  printed at commit when a staged path matches.
-  [gates] <gate> = "off" | "observe" | "enforce"  for fresh, laws, red_first, seals, verified, evidence.
+  [gates] <gate> = "off" | "observe" | "enforce"  for fresh, laws, red_first, seals, verified, evidence, guard.
                       observe prints what it would refuse and logs it to .git/agent-check-observe.log.
-                      Default: enforce, except verified and evidence (off).
+                      Default: enforce, except verified and evidence (off) and guard (observe).
                       evidence: a push whose severity owes evidence needs a passing evidence folder
                       for this commit (scripts/evidence --help).
 Test discovery, seals and the red-first check read Python test files (3.12 or newer); the rest is
@@ -51,6 +51,7 @@ from __future__ import annotations
 import ast
 import glob
 import hashlib
+import json
 import os
 import re
 import shlex
@@ -78,7 +79,7 @@ VERIFIED = re.compile(r"^Verified:[ \t]*(.*)$", re.M | re.I)
 LAWS = "LAWS.md"
 SEALS = ".sealed-tests"
 MODES = {"off", "observe", "enforce"}
-DEFAULT_MODE = {"fresh": "enforce", "laws": "enforce", "red_first": "enforce", "seals": "enforce", "verified": "off", "evidence": "off"}
+DEFAULT_MODE = {"fresh": "enforce", "laws": "enforce", "red_first": "enforce", "seals": "enforce", "verified": "off", "evidence": "off", "guard": "observe"}
 
 
 def git(*args: str, cwd: str | Path = ".", check: bool = True) -> str:
@@ -338,6 +339,32 @@ def seal(refs: list[str]) -> int:
     return 0
 
 
+def guard(cfg: dict, base: str | None) -> tuple[list[tuple[str, str]], list[str]]:
+    """scripts/guard over base..HEAD: (test-rule findings for the guard gate, refusals for every mode).
+    A credential in any pushed commit refuses whatever the gate says; a first push checks the whole history."""
+    tool = Path(__file__).resolve().parent / "guard"
+    if not tool.is_file():
+        return [], ["scripts/guard is missing, so this push cannot be checked for switched-off tests or credentials in its history: copy it from the kit beside agent-check."]
+    ran = subprocess.run([sys.executable, str(tool), "--base", base or "empty", "--tests", cfg.get("tests", "tests/"), "--json"], cwd=root(), capture_output=True, text=True)
+    try:  # only a well-formed answer counts: exit 0 with no findings, or exit 1 with some
+        findings = json.loads(ran.stdout)
+        keys = {"rule", "path", "line", "id", "what", "fix"}
+        if not (isinstance(findings, list) and all(isinstance(f, dict) and keys <= f.keys() for f in findings)
+                and ran.returncode == (1 if findings else 0)):
+            raise ValueError
+    except ValueError:
+        return [], [f"guard could not inspect this push (exit {ran.returncode}): {(ran.stderr.strip() or ran.stdout.strip())[-300:] or 'no output'}"]
+    found, hard = [], []
+    for f in findings:
+        where = f"{f['path']}:{f['line']}" if f["line"] else f["path"]
+        msg = f"[{f['rule']}] {where} id={f['id']} — {f['what']}. Fix: {f['fix']}"
+        if f["rule"] == "secret-history":
+            hard.append(msg)
+        elif mode(cfg, "guard") != "off":
+            found.append(("guard", msg))
+    return found, hard
+
+
 def push(base: str | None = None, suite: bool = True, hook: bool = False, config_from: str | None = None) -> int:
     head = git("rev-parse", "HEAD").strip()
     if hook:  # look at what is really being pushed; tags are not code to check
@@ -351,10 +378,15 @@ def push(base: str | None = None, suite: bool = True, hook: bool = False, config
     base = git("rev-parse", "--verify", f"{base}^{{commit}}").strip() if base else upstream_base()
     cfg = config(config_from) if config_from else {}
     cfg = cfg or config()  # a first commit has no base config to read
+    guarded, guard_hard = guard(cfg, base)  # credentials refuse even with no config; before the suite, so it cannot hide a finding
+    if guard_hard:
+        return refuse(guard_hard)
     if not cfg:
         return 0
-    if base is None:  # nothing upstream to compare with: the suite is all a first push can show
-        print("agent-check: first push (no upstream branch yet): only the suite runs; every other check starts with the next push.", file=sys.stderr)
+    if guarded and finish(cfg, guarded):
+        return 1
+    if base is None:  # nothing upstream to compare with: the suite and the guard are all a first push can show
+        print("agent-check: first push (no upstream branch yet): only the suite and the guard run; every other check starts with the next push.", file=sys.stderr)
         if suite and subprocess.run(cfg["test"], shell=True, cwd=root()).returncode != 0:
             return refuse(["the full suite failed on HEAD"])
         return 0

@@ -117,6 +117,10 @@ def main(argv: list[str]) -> int:
     print(f"  starts app: {(found['serve'] + ' (suggested in agent-check.toml: it must listen on $PORT)') if found['serve'] else 'not found: set [evidence] serve to use $EVIDENCE_URL in cases'}")
     for note in found["notes"]:
         print(f"  note:       {note}")
+    checker = repo / "scripts" / "agent-check"
+    if checker.exists() and ("def guard(" not in checker.read_text() or not (repo / "scripts" / "guard").exists()):
+        print("  note:       this repo's scripts/agent-check predates the guard (or scripts/guard is missing): copy both from the kit"
+              " together; install never overwrites them, and an older agent-check rejects `guard` in [gates].")
     print("\nTools:")
     missing = 0
     for name, present, why, install in tools(found):
