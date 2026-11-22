@@ -22,6 +22,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from collections import Counter
 from pathlib import Path
 
 GRANTS = ".guard-allow"
@@ -58,7 +59,6 @@ SECRET_FORMATS = tuple(re.compile(x) for x in (
 # Markers that switch a test off (Foreman L105-125), for pytest, unittest, Jest, Vitest, Mocha, Jasmine, Go, Rust, JUnit.
 SKIPPED_TEST = tuple(re.compile(x) for x in (
     r"\b(?:it|test|describe|context)(?:\.concurrent)?\.(?:skip|only)(?:\.each)?\s*[(`]",
-    r"\b(?:xit|xtest|xdescribe|fit|fdescribe)\s*\(",
     r"\bpytest\.mark\.(?:skip|xfail)\b", r"\bpytest\.(?:skip|xfail)\s*\(",
     r"@unittest\.(?:skip|expectedFailure)\b", r"\bself\.skipTest\s*\(",
     r"\braise\s+(?:unittest\.(?:case\.)?)?SkipTest\b",
@@ -79,8 +79,11 @@ PY_ALIAS_SKIP = re.compile(r"^\s*@(?:\w+\.)*(?:skip|xfail|expectedFailure)\s*(?:
 PY_ALIAS_CONDITIONAL = re.compile(r"^\s*@(?:\w+\.)*(?:skipif|skipIf|skipUnless)\s*\(")
 PY_MODULE_SKIP = re.compile(r"^\s*pytestmark\s*=.*\bmark\.(?:skip|xfail)\b(?!if)")
 PY_FILE = re.compile(r"(?i)\.pyw?$")
+JS_FILE = re.compile(r"(?i)\.(?:[cm]?[jt]sx?|vue|svelte)$")
+JASMINE = re.compile(r"(?<![.\w$])(?:xit|xtest|xdescribe|fit|fdescribe)\s*\(\s*['\"`]")  # a call, not `model.fit(`
 # Outside test files a marker counts only as code; in the files that run the check it counts as written (L319-335).
 _QUOTED = re.compile(r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'')
+_BACKTICKED = re.compile(r"`[^`]*`")  # a JS template or a name quoted in a docstring; the backticks stay, for test.each`...`
 _COMMENT = re.compile(r"(?:^|\s)(?:#(?!\[)|//).*$")
 _HASH_COMMENT = re.compile(r"(?:^|\s)#(?!\[).*$")
 CHECK_SURFACE = re.compile(r"(?i)(^|/)(\.github/|\.gitlab-ci\.ya?ml$|\.circleci/|azure-pipelines\.ya?ml$|Jenkinsfile$|"
@@ -144,10 +147,10 @@ def skip_kind(text: str, path: str) -> str | None:
     """"skip" for a marker that switches a test off, "conditional" for a conditional skip, else None."""
     if DOCS.search(path):
         return None
-    if not is_test_path(path) and not CHECK_SURFACE.search(path):
+    if not CHECK_SURFACE.search(path):
         comment = _HASH_COMMENT if PY_FILE.search(path) else _COMMENT
-        text = comment.sub("", _QUOTED.sub('""', text))
-    if any(r.search(text) for r in SKIPPED_TEST):
+        text = comment.sub("", _QUOTED.sub('""', _BACKTICKED.sub("``", text)))
+    if any(r.search(text) for r in SKIPPED_TEST) or (JS_FILE.search(path) and JASMINE.search(text)):
         return "skip"
     if any(r.search(text) for r in CONDITIONAL_SKIP):
         return "conditional"
@@ -256,19 +259,19 @@ def _past(lines: list[str], j: int) -> int:
     return j
 
 
-def covered(lines: list[str], n: int) -> str:
+def _subject(lines: list[str], n: int) -> tuple[list[str], list[str]]:
     """The test a finding at line n (1-based) covers, with the definitions around it. For a decorator: the
     line it decorates, past the rest of the decorator, comments and other decorators. For a call that names
     its test on the lines below (`it.skip(` then the name): those lines. Then the definitions it sits in."""
     i = n - 1
     if not 0 <= i < len(lines):
-        return ""
+        return [], []
     if _ANNOTATION.match(lines[i]):
         j = _past(lines, i)
         while j < len(lines) and (not lines[j].strip() or _COMMENT_LINE.match(lines[j]) or _ANNOTATION.match(lines[j])):
             j = _past(lines, j) if _ANNOTATION.match(lines[j]) else j + 1
         if j >= len(lines):
-            return ""
+            return [], []
         anchor, own = j, [lines[j]]
     else:
         anchor = i
@@ -279,7 +282,27 @@ def covered(lines: list[str], n: int) -> str:
         if lines[j].strip() and here < indent and _DEFINITION.match(lines[j]):
             chain.append(lines[j])
             indent = here
-    return " / ".join(norm(c) for c in [*reversed(chain), *own])
+    return list(reversed(chain)), own
+
+
+def covered(lines: list[str], n: int) -> str:
+    chain, own = _subject(lines, n)
+    return " / ".join(norm(c) for c in [*chain, *own])
+
+
+_NAME = re.compile(r"(?:def|class|fn|func|fun|void)\s+(`[^`]+`|\w+)|(['\"`])(.*?)\2")
+
+
+def test_name(lines: list[str], n: int) -> str:
+    """The name of the test a finding at line n covers (`test_login`, "adds one"), whatever its indentation."""
+    chain, own = _subject(lines, n)
+    m = _NAME.search(own[0] if own else chain[-1] if chain else "")
+    return (m.group(1) or m.group(3)) if m else ""
+
+
+def skips_in(lines: list[str], path: str) -> Counter:
+    """(marker, the test it covers) for every skip in a file."""
+    return Counter((norm(t), test_name(lines, i + 1)) for i, t in enumerate(lines) if skip_kind(t, path))
 
 
 def file_changes(base: str, head: str):
@@ -334,10 +357,30 @@ def scan(base: str, head: str = "HEAD", tests: str = "") -> list[dict]:
             new_side.setdefault(path, []).append((n, sign, text))
     at_head: dict[str, list[str]] = {}
 
-    def following(path, n):  # the test the finding covers, read from the file as pushed
+    def pushed(path):  # the file as pushed; a git failure here is "could not inspect", never "no finding"
         if path not in at_head:
             at_head[path] = git("show", f"{head}:{path}").split("\n")
-        return covered(at_head[path], n)
+        return at_head[path]
+
+    def following(path, n):  # the test the finding covers
+        return covered(pushed(path), n)
+
+    # A skip that was already on the same test before the push (re-indented, or moved with its test) is not new.
+    old_path = {new: old for old, new in renamed}
+
+    def at_base(path):  # missing at the base only makes a skip count as new, so a failure here fails closed
+        try:
+            return git("show", f"{base}:{old_path.get(path, path)}").split("\n")
+        except CannotInspect:
+            return []
+    before, after = Counter(), Counter()
+    if any(sign == "+" and skip_kind(text, path) for _, path, _, sign, text in rows):
+        for path in {*new_side, *removed_by_path, *deleted}:
+            if base != EMPTY_TREE:
+                before += skips_in(at_base(path), path)
+            if path in new_side:
+                after += skips_in(pushed(path), path)
+    new_pairs = {k for k in after if after[k] > before[k]}
 
     for path, lines in new_side.items():
         flagged = set()
@@ -346,8 +389,9 @@ def scan(base: str, head: str = "HEAD", tests: str = "") -> list[dict]:
                 continue
             kind = skip_kind(text, path)
             if kind == "skip" or (kind == "conditional" and path not in added):
-                add("test-skipped", path, n, content=text, following=following(path, n))
                 flagged.add(n)
+                if (norm(text), test_name(pushed(path), n)) in new_pairs:
+                    add("test-skipped", path, n, content=text, following=following(path, n))
         if is_test_path(path) and path in removed_by_path:  # a test renamed out of collection
             py, go, js = test_definitions(removed_by_path[path])
             spy, sgo, sjs = test_definitions([t for _, s, t in lines if s == "+"])
@@ -367,12 +411,27 @@ def scan(base: str, head: str = "HEAD", tests: str = "") -> list[dict]:
                 COLLECTED_NAME.search(old) and not (is_test_code(new) and COLLECTED_NAME.search(new)))):
             add("test-moved", old, 0, f"to {new}", version=f"{new}@{blob(head, new)}")
 
-    # Every commit's own patch, merges against each parent, so a credential removed later is still seen.
+    # Every commit's own patch, so a credential removed later is still seen.
     log_range = head if base == EMPTY_TREE else f"{base}..{head}"
+    patch = ("--text", "--no-color", "--no-ext-diff", "--no-textconv")
     seen = set()
-    history = git("log", "-p", "-m", "--root", "--text", "--no-color", "--no-ext-diff", "--no-textconv", "--format=%x01%H", log_range)
-    for commit, path, n, sign, text in hunks(history):
-        if sign == "+" and (path, text) not in seen and any(r.search(text) for r in SECRET_FORMATS):
+
+    def secrets(text):
+        return {(path, line): n for _, path, n, sign, line in hunks(text)
+                if sign == "+" and any(r.search(line) for r in SECRET_FORMATS)}
+    hits = []
+    for commit, path, n, sign, text in hunks(git("log", "-p", "--no-merges", "--root", *patch, "--format=%x01%H", log_range)):
+        if sign == "+" and any(r.search(text) for r in SECRET_FORMATS):
+            hits.append((commit, path, n, text))
+    # A merge counts only for what it adds beyond every parent: one that brings in a credential its other parent
+    # already had is not adding it (that parent's own commits are scanned, or already in the base).
+    for merge in git("rev-list", "--merges", log_range).split():
+        parents = git("rev-list", "--parents", "-n", "1", merge).split()[1:]
+        per_parent = [secrets(git("diff", *patch, parent, merge)) for parent in parents]
+        hits += [(merge, path, n, text) for (path, text), n in per_parent[0].items()
+                 if all((path, text) in other for other in per_parent[1:])]
+    for commit, path, n, text in hits:
+        if (path, text) not in seen:
             seen.add((path, text))
             add("secret-history", path, n, f"commit {commit[:8]}", content=text, commit=commit)
     commit = ""  # commit messages are history too

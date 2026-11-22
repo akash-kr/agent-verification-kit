@@ -1534,7 +1534,7 @@
   },
   {
    "name": "test-file-quoted-marker",
-   "from": "test_detector.py::test_outside_test_files_only_a_marker_written_as_code_counts",
+   "from": "test_detector.py::test_outside_test_files_only_a_marker_written_as_code_counts (flipped: in this kit a marker inside a string or comment never counts, test files included)",
    "commits": [
     {
      "write": {
@@ -1547,9 +1547,7 @@
      }
     }
    ],
-   "expect": [
-    "test-skipped"
-   ]
+   "expect": []
   },
   {
    "name": "outside-floor-div-then-marker",
@@ -3227,6 +3225,51 @@
     {
      "write": {
       "tests/test_x.py": "import unittest\n\n\nclass T(unittest.TestCase):\n    y = 1\f    @unittest.skip('x')\n    def test_one(self):\n        pass\n"
+     }
+    }
+   ],
+   "expect": [
+    "test-skipped"
+   ]
+  },
+  {
+   "name": "marker-in-backticks-in-a-docstring",
+   "from": "demo, 2026-11-22: the kit's own scripts/guard tripped its first push",
+   "commits": [
+    {
+     "write": {
+      "app/lib.py": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "app/lib.py": [
+       "def f():",
+       "    \"\"\"Handles a call like `it.skip(` on the next line.\"\"\"",
+       "    return 1"
+      ]
+     }
+    }
+   ],
+   "expect": []
+  },
+  {
+   "name": "js-each-template-skip-still-counts",
+   "from": "demo, 2026-11-22",
+   "commits": [
+    {
+     "write": {
+      "tests/a.test.js": "x = 1\n"
+     }
+    },
+    {
+     "write": {
+      "tests/a.test.js": [
+       "test.skip.each`",
+       "  a | b",
+       "`('adds', () => {});",
+       "x = 1"
+      ]
      }
     }
    ],

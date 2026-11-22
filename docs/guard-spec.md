@@ -48,8 +48,15 @@ Each law is held by blind-written, sealed tests in `tests/test_guard_laws.py`, t
 | `secret-history` | a credential in a known format in any pushed commit (its changes or its message), even one a later commit removed | `history_secrets` L704, `SECRET_FORMATS` L56 |
 
 - Markers are matched as text, so these rules cover Python, JS, Go, Rust and Java.
-- Outside test files, a marker counts only as code, not inside a string or comment. The exception is
+- A marker counts only as code, not inside a string or comment, test files included. The exception is
   files that run the check (workflows, Makefile, `tox.ini`, `package.json`), where any mention counts.
+- Jasmine's `fit(`, `fdescribe(`, `xit(` count only in JS and TS files, as a call with a test name, so
+  `model.fit(X, y)` is not a skip.
+- A skip already on the same test before the push is not new: re-indenting it, or moving the test with
+  its skip to another changed file, passes. Moving a skip to a different test, or adding a second copy,
+  is still refused.
+- A merge counts only for the credentials it adds beyond every parent, so merging in main is not refused
+  for a credential main already had. The commit that first added it is scanned on its own.
 - `secret-history` uses known formats only (`SECRET_FORMATS`). Guesses stay with the commit check, which
   is unchanged in v1. Switching the commit check to Foreman's lists would loosen it.
 
