@@ -50,7 +50,13 @@ refused "a proof from an older commit"
 
 say "The honest way: run the check on the commit being pushed, and read what it says."
 show ".claude/skills/verify/check.sh"
-bash .claude/skills/verify/check.sh 2>&1 | grep -E "^(PASS|FAIL|RESULT)" | indent
+bash .claude/skills/verify/check.sh > "$work/out/check.txt" 2>&1 || expect "the check failed"
+grep -E "^(PASS|FAIL|RESULT)" "$work/out/check.txt" | indent
+# what the push reads: this commit, a clean tree, the hash of each file the check wrote (folder shortened to shop/)
+sed -E 's#/[^ ]*/shop/#shop/#g' .test-tmp/verify/passed > "$work/out/proof.txt"
+sed -i '' -E 's#/[^ ]*/shop/#shop/#g' "$work/out/check.txt" 2>/dev/null || sed -i -E 's#/[^ ]*/shop/#shop/#g' "$work/out/check.txt"
+show "cat .test-tmp/verify/passed      # the proof the push reads"
+indent < "$work/out/proof.txt"
 pushes "the honest push"
 printf '  \033[1;32m✓ pushed\033[0m, with proof from a passing check on this exact commit.\n'
 keep stale-proof "$work/out"

@@ -11,7 +11,9 @@
   "diff-2.txt",
   "refusal-1.txt",
   "refusal-2.txt",
-  "run.txt"
+  "run.txt",
+  "tests-old-code.txt",
+  "tests-this-commit.txt"
  ],
  "missing-evidence": [
   "cases.jsonl",
@@ -28,8 +30,10 @@
   "run.txt"
  ],
  "stale-proof": [
+  "check.txt",
   "diff-1.txt",
   "diff-2.txt",
+  "proof.txt",
   "refusal-1.txt",
   "refusal-2.txt",
   "run.txt"
@@ -38,6 +42,7 @@
   "cases.jsonl",
   "evidence.md",
   "failed-requests.txt",
+  "flow-copy.gif",
   "flow-copy.mp4",
   "labels.json",
   "media/desktop.png",

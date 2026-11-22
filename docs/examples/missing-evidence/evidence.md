@@ -1,6 +1,6 @@
 # Evidence: PASS
 
-- Commit: `4b0b891b9c` (change starts at `a221d26f72`, 2 files)
+- Commit: `86ff56d2ef` (change starts at `41df65f77e`, 2 files)
 - Surfaces: logic. Intent: feature. Severity: high (labelled by rules).
 - Recorded by: the author. Every result below was captured from a real run, not typed.
 
@@ -26,7 +26,7 @@ Got:
 ```
 HTTP/1.0 200 OK
 Server: BaseHTTP/0.6 Python/3.14.5
-Date: Sun, 22 Nov 2026 09:51:46 GMT
+Date: Sun, 22 Nov 2026 10:24:01 GMT
 Content-Type: application/json
 
 {"to_pay": 48.0}
@@ -52,7 +52,7 @@ Got:
 ```
 HTTP/1.0 400 Bad Request
 Server: BaseHTTP/0.6 Python/3.14.5
-Date: Sun, 22 Nov 2026 09:51:47 GMT
+Date: Sun, 22 Nov 2026 10:24:01 GMT
 Content-Type: application/json
 
 {"error": "prices must be numbers"}

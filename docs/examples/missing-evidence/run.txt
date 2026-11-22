@@ -3,11 +3,11 @@
   agent › Added VAT. The suite passes, so I'm pushing.
   $ git push
   agent-check refused:
-  - this push is high severity (logic) and owes human evidence on commit 4b0b891b, and there is none that passes: run `evidence start`, record the cases with `evidence run`, then `evidence finish`.
+  - this push is high severity (logic) and owes human evidence on commit 86ff56d2, and there is none that passes: run `evidence start`, record the cases with `evidence run`, then `evidence finish`.
 
 ▌ The agent records evidence for this exact commit: real requests to the app it just built.
   $ scripts/evidence start
-  evidence/2026-11-22-feat-20-vat-at-checkout-4b0b891b9c
+  evidence/2026-11-22-feat-20-vat-at-checkout-86ff56d2ef
   surfaces: logic   intent: feature   severity: high   owes: human   (by rules)
     logic: a table of input, expected output and actual output from calling it for real
   $ scripts/evidence run --case "..." --expect-contains '"to_pay": 48' -- curl $EVIDENCE_URL/checkout?prices=20,20
@@ -15,7 +15,7 @@
   $ scripts/evidence run --case "..." --expect-status 400 -- curl $EVIDENCE_URL/checkout?prices=20,abc
   PASS  a price that is not a number is refused
   $ scripts/evidence finish
-  PASS  evidence/2026-11-22-feat-20-vat-at-checkout-4b0b891b9c/evidence.md
+  PASS  evidence/2026-11-22-feat-20-vat-at-checkout-86ff56d2ef/evidence.md
   $ git push
-  evidence: evidence/2026-11-22-feat-20-vat-at-checkout-4b0b891b9c/evidence.md — read it before you push.
+  evidence: evidence/2026-11-22-feat-20-vat-at-checkout-86ff56d2ef/evidence.md — read it before you push.
   ✓ pushed, with the page the owner reads before it ships.

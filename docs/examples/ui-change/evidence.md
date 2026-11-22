@@ -1,6 +1,6 @@
 # Evidence: PASS
 
-- Commit: `c1291591e2` (change starts at `44bd22925a`, 2 files)
+- Commit: `d24c9924bd` (change starts at `025bda6b0e`, 2 files)
 - Surfaces: logic, ui. Intent: feature. Severity: low (labelled by rules).
 - Recorded by: the author. Every result below was captured from a real run, not typed.
 
@@ -27,7 +27,7 @@ Got:
 ```
 HTTP/1.0 200 OK
 Server: BaseHTTP/0.6 Python/3.14.5
-Date: Sun, 22 Nov 2026 09:51:28 GMT
+Date: Sun, 22 Nov 2026 10:23:41 GMT
 Content-Type: text/html; charset=utf-8
 
 <!doctype html>
@@ -62,7 +62,7 @@ On the old code it gave:
 ```
 HTTP/1.0 200 OK
 Server: BaseHTTP/0.6 Python/3.14.5
-Date: Sun, 22 Nov 2026 09:51:28 GMT
+Date: Sun, 22 Nov 2026 10:23:41 GMT
 Content-Type: text/html; charset=utf-8
 
 <!doctype html>

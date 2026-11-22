@@ -80,4 +80,8 @@ keep ui-change "$folder"
 if command -v ffmpeg >/dev/null; then
   ffmpeg -v error -y -i "$kit/docs/examples/ui-change/media/flow.webm" -c:v libx264 -pix_fmt yuv420p -movflags +faststart \
     "$kit/docs/examples/ui-change/flow-copy.mp4"
+  # and a GIF, because a GitHub README plays GIFs inline but not videos kept in the repo
+  ffmpeg -v error -y -i "$kit/docs/examples/ui-change/media/flow.webm" \
+    -vf "fps=8,scale=640:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse=dither=none" \
+    "$kit/docs/examples/ui-change/flow-copy.gif"
 fi

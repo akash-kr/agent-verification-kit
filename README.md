@@ -58,17 +58,17 @@ Cursor, Gemini) and any human, and it needs only git, bash and Python 3.12+ (the
 
 ## Examples: what the agent has to show
 
-Six runs of the real kit on a tiny shop, each with the refusals and the evidence it left behind. The
-[project page](https://akash-kr.github.io/receipts/#examples) plays them; the files are in `docs/examples/`.
+Six kinds of evidence, each recorded by the real kit on a tiny shop. The
+[project page](https://akash-kr.github.io/receipts/#examples) has a tab for each, with the run that made it.
 
-| Example | What the agent does | What it gets | The samples |
-|---|---|---|---|
-| Bug fix | Fixes a coupon bug | An evidence page with the same request on the old code (`{"total": 30.0}`) and the fix (`{"total": 36.0}`) | [evidence page](docs/examples/api-bug-fix/evidence.md) |
-| UI change | Adds a coupon box | A recording of the real page, phone and desktop screenshots, console and network errors | [evidence page](docs/examples/ui-change/evidence.md), [recording](docs/examples/ui-change/flow-copy.mp4) |
-| Billing code | Pushes `billing/` on a green suite | Refused until it records evidence a person reads | [refusal](docs/examples/missing-evidence/refusal-1.txt), [evidence page](docs/examples/missing-evidence/evidence.md) |
-| A test that tests nothing | Adds a test with its fix | Refused twice (no logged bug, then it passes on the old code); the third test goes through | [run](docs/examples/bug-test/run.txt) |
-| A sealed test | Loosens the owner's sealed test | Refused: the test no longer matches its seal | [run](docs/examples/sealed-test/run.txt) |
-| Old proof | Edits after its last check | Refused at commit and at push until it checks this commit | [run](docs/examples/stale-proof/run.txt) |
+| Evidence | What the agent attaches | Sample from the run |
+|---|---|---|
+| **Before and after** | The same request on the old code and on this commit. For a bug fix the old code has to fail it | Old code `{"total": 30.0}`, this commit `{"total": 36.0}`. [Evidence page](docs/examples/api-bug-fix/evidence.md) |
+| **Screenshots and video** | A recording of the real page, phone and desktop screenshots, and the requests and errors the page had | <img src="docs/examples/ui-change/flow-copy.gif" width="300" alt="The agent's browser types 10 into the coupon box and the total goes from $40 to $36"> <img src="docs/examples/ui-change/media/phone.png" width="90" alt="Phone screenshot of the cart with a $36 total"><br>[Evidence page](docs/examples/ui-change/evidence.md), [requests](docs/examples/ui-change/requests.txt) |
+| **Read by a person** | High-stakes code (here `billing/`) is refused on a green suite until it has an evidence page, which the push prints for a person to read | [Refusal](docs/examples/missing-evidence/refusal-1.txt), [evidence page](docs/examples/missing-evidence/evidence.md) |
+| **A test that fails first** | A new test names a logged bug, fails on the old code and passes on this commit | Old code `0 passed, 1 failed`, this commit `2 passed, 0 failed`. [Old code](docs/examples/bug-test/tests-old-code.txt), [this commit](docs/examples/bug-test/tests-this-commit.txt), [the refusals before it](docs/examples/bug-test/run.txt) |
+| **A sealed test** | Nothing can pass this one: the agent edited the owner's sealed test to turn the suite green, and the push is refused | [Refusal](docs/examples/sealed-test/refusal-1.txt), [the edit it refused](docs/examples/sealed-test/diff-1.txt) |
+| **Proof for this commit** | A passing real-app check on this exact commit: the commit, "clean", and a hash of each file the check wrote | [Proof file](docs/examples/stale-proof/proof.txt), [check output](docs/examples/stale-proof/check.txt) |
 
 Run them with `examples/run-all.sh` (about 30 seconds); [examples/README.md](examples/README.md) has the
 details and how to remove them.

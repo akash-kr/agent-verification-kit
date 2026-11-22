@@ -1,0 +1,3 @@
+4ed8721a09e3400a8a78a2c27ce30eb878d33278
+clean
+8382691dddce712dff082e95190d9bce09373401d52dfc0fc6c748ddd7d9e5a4  shop/.test-tmp/verify/steps.log

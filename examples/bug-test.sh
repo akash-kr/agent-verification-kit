@@ -36,6 +36,17 @@ p = "tests/test_cart.py"; t = open(p).read()
 open(p, "w").write(t.replace("assert total([20, 20], coupon=0) == 40", "assert total([20, 20], coupon=10) == 36"))
 PY
 quiet git add -A; quiet git commit -m "test: the coupon takes 10% off" --trailer "Verified: 2 tests pass"
+base="$(git rev-parse @{u})"   # the old code: what the remote had before this push
 pushes "the honest fix"
 printf '  \033[1;32m✓ pushed\033[0m: the test names B1, fails on the old code and passes on the new.\n'
+
+say "What red-first ran before letting it through: the new test on the old code, then the suite on this commit."
+quiet git worktree add --detach "$work/old" "$base"
+cp tests/test_cart.py "$work/old/tests/test_cart.py"
+show "python3 run_tests.py tests/test_cart.py test_coupon      # on the old code ($(git rev-parse --short=8 "$base"))"
+if (cd "$work/old" && python3 run_tests.py tests/test_cart.py test_coupon) > "$work/out/tests-old-code.txt" 2>&1; then expect "the new test passed on the old code"; fi
+indent < "$work/out/tests-old-code.txt"
+show "python3 run_tests.py      # on this commit ($(git rev-parse --short=8 HEAD))"
+python3 run_tests.py > "$work/out/tests-this-commit.txt" 2>&1 || expect "the suite failed on this commit"
+indent < "$work/out/tests-this-commit.txt"
 keep bug-test "$work/out"

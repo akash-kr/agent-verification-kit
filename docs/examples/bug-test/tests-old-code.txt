@@ -1,0 +1,2 @@
+FAIL tests/test_cart.py::test_coupon: assert total([20, 20], coupon=10) == 36
+0 passed, 1 failed

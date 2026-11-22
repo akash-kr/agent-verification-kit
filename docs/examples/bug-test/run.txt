@@ -8,8 +8,15 @@
 ▌ Try two: the agent tags the test [B1], but it still checks nothing the fix changed.
   $ git push
   agent-check refused:
-  - tests/test_cart.py::test_coupon passes on the old code (afa2ea11), so it tests nothing this change made true.
+  - tests/test_cart.py::test_coupon passes on the old code (9f99a4b6), so it tests nothing this change made true.
 
 ▌ Try three: a test of the bug itself. It must fail on the old code and pass on the new.
   $ git push
   ✓ pushed: the test names B1, fails on the old code and passes on the new.
+
+▌ What red-first ran before letting it through: the new test on the old code, then the suite on this commit.
+  $ python3 run_tests.py tests/test_cart.py test_coupon      # on the old code (9f99a4b6)
+  FAIL tests/test_cart.py::test_coupon: assert total([20, 20], coupon=10) == 36
+  0 passed, 1 failed
+  $ python3 run_tests.py      # on this commit (7d1e36c8)
+  2 passed, 0 failed

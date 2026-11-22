@@ -4,7 +4,7 @@
 
 ▌ Proving it on the real page, not with a green suite.
   $ scripts/evidence start
-  evidence/2026-11-22-feat-coupon-box-on-the-cart-page-c1291591e2
+  evidence/2026-11-22-feat-coupon-box-on-the-cart-page-d24c9924bd
   surfaces: logic, ui   intent: feature   severity: low   owes: agent   (by rules)
     ui: screenshots at phone and desktop width, one real recording, console and failed network requests
   $ scripts/evidence run --case "..." --before --expect-contains "id=\"coupon\"" -- curl $EVIDENCE_URL/
@@ -14,7 +14,7 @@
   $ scripts/evidence attach --case "..." flow.webm desktop.png phone.png
   attached flow.webm, desktop.png, phone.png
   $ scripts/evidence finish
-  PASS  evidence/2026-11-22-feat-coupon-box-on-the-cart-page-c1291591e2/evidence.md
+  PASS  evidence/2026-11-22-feat-coupon-box-on-the-cart-page-d24c9924bd/evidence.md
   $ git push
-  evidence: evidence/2026-11-22-feat-coupon-box-on-the-cart-page-c1291591e2/evidence.md
+  evidence: evidence/2026-11-22-feat-coupon-box-on-the-cart-page-d24c9924bd/evidence.md
   ✓ pushed with screenshots and a recording of the real page.

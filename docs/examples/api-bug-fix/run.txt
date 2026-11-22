@@ -4,7 +4,7 @@
 
 ▌ Proving it: the same request on the old code and the new code.
   $ scripts/evidence start
-  evidence/2026-11-22-fix-coupon-is-a-percentage-ee2072baf8
+  evidence/2026-11-22-fix-coupon-is-a-percentage-c76a01b97c
   surfaces: logic   intent: bug   severity: low   owes: agent   (by rules)
     logic: a table of input, expected output and actual output from calling it for real
     bug fix: run at least one case with --before, so the page shows it failing on the old code.
@@ -13,7 +13,7 @@
   $ scripts/evidence run --case "..." --expect-status 400 -- curl $EVIDENCE_URL/total?prices=20,20&coupon=ten
   PASS  a coupon that is not a number is refused
   $ scripts/evidence finish
-  PASS  evidence/2026-11-22-fix-coupon-is-a-percentage-ee2072baf8/evidence.md
+  PASS  evidence/2026-11-22-fix-coupon-is-a-percentage-c76a01b97c/evidence.md
   $ git push
-  evidence: evidence/2026-11-22-fix-coupon-is-a-percentage-ee2072baf8/evidence.md
+  evidence: evidence/2026-11-22-fix-coupon-is-a-percentage-c76a01b97c/evidence.md
   ✓ pushed with its evidence page.

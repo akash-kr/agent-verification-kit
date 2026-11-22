@@ -1,6 +1,6 @@
 # Evidence: PASS
 
-- Commit: `ee2072baf8` (change starts at `c391df35d4`, 1 files)
+- Commit: `c76a01b97c` (change starts at `5b20e25f3f`, 1 files)
 - Surfaces: logic. Intent: bug. Severity: low (labelled by rules).
 - Recorded by: the author. Every result below was captured from a real run, not typed.
 
@@ -27,7 +27,7 @@ Got:
 ```
 HTTP/1.0 200 OK
 Server: BaseHTTP/0.6 Python/3.14.5
-Date: Sun, 22 Nov 2026 09:51:24 GMT
+Date: Sun, 22 Nov 2026 10:23:37 GMT
 Content-Type: application/json
 
 {"total": 36.0}
@@ -38,7 +38,7 @@ On the old code it gave:
 ```
 HTTP/1.0 200 OK
 Server: BaseHTTP/0.6 Python/3.14.5
-Date: Sun, 22 Nov 2026 09:51:24 GMT
+Date: Sun, 22 Nov 2026 10:23:37 GMT
 Content-Type: application/json
 
 {"total": 30.0}
@@ -64,7 +64,7 @@ Got:
 ```
 HTTP/1.0 400 Bad Request
 Server: BaseHTTP/0.6 Python/3.14.5
-Date: Sun, 22 Nov 2026 09:51:25 GMT
+Date: Sun, 22 Nov 2026 10:23:38 GMT
 Content-Type: application/json
 
 {"error": "prices and coupon must be numbers"}

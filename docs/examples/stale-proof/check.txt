@@ -1,0 +1,5 @@
+PASS  the cart page loads
+PASS  the total comes back for a $40 cart
+RESULT: all checks passed
+Read these before saying it works (the log, and every screenshot):
+  shop/.test-tmp/verify/steps.log
