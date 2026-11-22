@@ -127,7 +127,7 @@ footer { border-top: 1px solid var(--line); padding: 28px 0 48px; font-family: v
     <a class="brand" href="#" aria-label="Receipts">
       <picture><source srcset="assets/logo-dark.svg" media="(prefers-color-scheme: dark)"><img src="assets/logo-light.svg" alt="Receipts" width="248" height="34"></picture>
     </a>
-    <div class="links"><a href="#demo">Demo</a><a href="#catches">What it catches</a><a href="#use">Use it</a><a href="https://github.com/akash-kr/agent-verification-kit">GitHub</a></div>
+    <div class="links"><a href="#demo">Demo</a><a href="#catches">What it catches</a><a href="#use">Use it</a><a href="https://github.com/akash-kr/receipts">GitHub</a></div>
   </nav>
 
   <header class="hero">
@@ -159,8 +159,8 @@ footer { border-top: 1px solid var(--line); padding: 28px 0 48px; font-family: v
     <div class="video">
       <video src="assets/receipts.mp4" poster="assets/receipts-poster.png" controls muted playsinline preload="metadata" width="1280" height="720"></video>
     </div>
-    <pre><code>git clone https://github.com/akash-kr/agent-verification-kit
-cd agent-verification-kit &amp;&amp; demo/run.sh     # git and Python 3.12+, runs in a throwaway folder</code></pre>
+    <pre><code>git clone https://github.com/akash-kr/receipts
+cd receipts &amp;&amp; demo/run.sh     # git and Python 3.12+, runs in a throwaway folder</code></pre>
   </div>
 </section>
 
@@ -179,14 +179,14 @@ cd agent-verification-kit &amp;&amp; demo/run.sh     # git and Python 3.12+, run
     <h2>Set it up in a repo</h2>
     <p class="lede">It's git hooks, a Python script and a CI workflow. Claude Code, Codex, Cursor, Gemini and people all push through the same checks.</p>
     <ol class="steps">
-      <li><div>Install it into your repo.<pre><code>git clone https://github.com/akash-kr/agent-verification-kit ~/agent-verification-kit
-~/agent-verification-kit/scripts/setup /path/to/your/repo --github</code></pre></div></li>
+      <li><div>Install it into your repo.<pre><code>git clone https://github.com/akash-kr/receipts ~/receipts
+~/receipts/scripts/setup /path/to/your/repo --github</code></pre></div></li>
       <li><div>Point <code>agent-check.toml</code> at your test command and test folder.<p>It starts as test = "python -m pytest -q" and tests = "tests/". Change both to what your repo runs.</p></div></li>
       <li><div>Tell your agents the rules.<p>Paste docs/VERIFICATION.md into your AGENTS.md or CLAUDE.md.</p></div></li>
       <li><div>Watch for a week, then switch on.<p>The guard starts in observe: it logs what it would refuse. Read the log, then set guard = "enforce". A key in history is refused from day one.</p></div></li>
       <li><div>When a push is refused, fix the code.<p>Only the owner grants a finding, through .guard-allow. Protect it with CODEOWNERS and branch protection.</p></div></li>
     </ol>
-    <p class="note">The guard is one part of the kit. The rest makes an agent prove a change works with a real run tied to the commit, seals the tests that hold your rules, and requires a bug test to fail before the fix. <a href="https://github.com/akash-kr/agent-verification-kit#readme">Read the README</a>.</p>
+    <p class="note">The guard is one part of the kit. The rest makes an agent prove a change works with a real run tied to the commit, seals the tests that hold your rules, and requires a bug test to fail before the fix. <a href="https://github.com/akash-kr/receipts#readme">Read the README</a>.</p>
   </div>
 </section>
 
@@ -204,7 +204,7 @@ cd agent-verification-kit &amp;&amp; demo/run.sh     # git and Python 3.12+, run
 </section>
 
 <div class="wrap">
-  <footer><span>Receipts · MIT license</span><a href="https://github.com/akash-kr/agent-verification-kit">github.com/akash-kr/agent-verification-kit</a></footer>
+  <footer><span>Receipts · MIT license</span><a href="https://github.com/akash-kr/receipts">github.com/akash-kr/receipts</a></footer>
 </div>
 
 <script>

@@ -18,7 +18,7 @@ That's a real run of `demo/run.sh` ([video](docs/assets/receipts.mp4)). Try it y
 and Python 3.12+, and it runs in a throwaway folder:
 
 ```bash
-git clone https://github.com/akash-kr/agent-verification-kit && cd agent-verification-kit && demo/run.sh
+git clone https://github.com/akash-kr/receipts && cd receipts && demo/run.sh
 ```
 
 ## What it catches
@@ -59,8 +59,8 @@ Cursor, Gemini) and any human, and it needs only git, bash and Python 3.12+ (the
 ## Quick start
 
 ```bash
-git clone https://github.com/akash-kr/agent-verification-kit ~/agent-verification-kit
-~/agent-verification-kit/scripts/setup /path/to/your/repo --github
+git clone https://github.com/akash-kr/receipts ~/receipts
+~/receipts/scripts/setup /path/to/your/repo --github
 ```
 
 It copies the files, detects your suite, app and surfaces, and lists any missing tool with its install
