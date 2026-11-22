@@ -12,10 +12,11 @@ one, move it out of the suite, or slip a key into history, and the push is refus
 is green. Agents also have to show evidence that a change works, and the checks that judge a change stay
 out of its reach.
 
-![An agent skips a failing test and the push is refused; it hides a key and deletes it a commit later, and that push is refused too; the honest fix goes through.](docs/assets/receipts.gif)
+![An agent skips a failing test and the push is refused; it hides a key and deletes it a commit later, and that push is refused too; the honest fix goes through.](docs/assets/receipts-film.gif)
 
-That's a real run of `demo/run.sh` ([video](docs/assets/receipts.mp4)). Try it yourself. It needs git
-and Python 3.12+, and it runs in a throwaway folder:
+Every line in it is copied from real runs. The [full film](docs/assets/receipts-film.mp4) (56 s) goes
+on to the evidence an agent has to show. Try it yourself with `demo/run.sh`. It needs git and
+Python 3.12+, and it runs in a throwaway folder:
 
 ```bash
 git clone https://github.com/akash-kr/receipts && cd receipts && demo/run.sh
@@ -104,7 +105,8 @@ templates/               LAWS.md, agent-check.toml, git hooks, GitHub Actions, a
                          UI recipes, the classifier command
 references/              evidence, laws and seals, gates, test types, measuring reviewers
 tests/                   the kit's own tests: run each of tests/test_*.py with python3
-demo/                    run.sh, the 30-second demo; record.py and render.py rebuild its GIF and video
+demo/                    run.sh, the 30-second demo; film/, the source of the film above; record.py and
+                         render.py, the older terminal recording
 examples/                six runs on a sample shop that write the samples in docs/examples/
 docs/                    the guard spec, evidence design, and the project page (index.html, assets/)
 ```
