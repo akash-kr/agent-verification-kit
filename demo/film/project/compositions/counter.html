@@ -1,0 +1,409 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      font-family: "IBM Plex Mono", monospace;
+      overflow: hidden;
+    }
+    /* Titles on the ground */
+    #ct-titles {
+      position: absolute;
+      left: 120px;
+      top: 96px;
+      width: 1680px;
+      height: 96px;
+    }
+    #ct-titles .t {
+      position: absolute;
+      left: 0;
+      top: 0;
+      white-space: nowrap;
+      font: 76px/1 "Archivo Black", sans-serif;
+      letter-spacing: -0.01em;
+      color: #ffffff;
+    }
+    #ct-titles .w {
+      display: inline-block;
+      opacity: 0;
+    }
+    #ct-t1 .w {
+      opacity: 1;
+    }
+    /* The agent's terminal */
+    #ct-term {
+      position: absolute;
+      left: 120px;
+      top: 236px;
+      width: 900px;
+      height: 730px;
+      background: #121317;
+      border-radius: 16px;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35);
+      overflow: hidden;
+    }
+    #ct-term .bar {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 22px;
+      border-bottom: 1px solid #22242b;
+    }
+    #ct-term .bar i {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #3a3d45;
+    }
+    #ct-term .bar span {
+      margin-left: 14px;
+      font: 28px "IBM Plex Mono", monospace;
+      color: #8b93a1;
+    }
+    #ct-term .page {
+      position: absolute;
+      left: 36px;
+      top: 78px;
+      right: 36px;
+    }
+    .ln {
+      height: 40px;
+      font-size: 28px;
+      line-height: 40px;
+      white-space: pre;
+      color: #e6e8ec;
+      opacity: 0;
+    }
+    .ln.pre {
+      opacity: 1;
+    }
+    .ln .tx {
+      display: inline-block;
+    }
+    .p {
+      color: #8b93a1;
+    }
+    .ag {
+      color: #f2c14e;
+    }
+    .ln.bad {
+      color: #ff8a80;
+    }
+    .ln.ok {
+      color: #7ee2a0;
+    }
+    /* The printer and its paper */
+    #ct-pw {
+      position: absolute;
+      left: 1080px;
+      top: 0;
+      width: 740px;
+      height: 972px;
+      overflow: hidden;
+    }
+    .rcw {
+      position: absolute;
+      left: 20px;
+      top: 0;
+      width: 700px;
+      opacity: 0;
+      filter: drop-shadow(0 18px 24px rgba(0, 0, 0, 0.35)) blur(0px);
+    }
+    .rc {
+      position: relative;
+      width: 700px;
+      padding: 40px 32px;
+      background: #ffffff;
+      color: #1c1b19;
+      -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 28px 51% repeat-x,
+        conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / 28px 51% repeat-x;
+      mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 28px 51% repeat-x,
+        conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / 28px 51% repeat-x;
+    }
+    .rrow {
+      height: 42px;
+      font-size: 28px;
+      line-height: 42px;
+      white-space: pre;
+    }
+    .rrow.dim {
+      color: #5c5f66;
+    }
+    .rrow.b {
+      font-weight: 700;
+    }
+    .rrow.rule {
+      border-top: 3px dashed #1c1b19;
+      height: 42px;
+      margin-top: 20px;
+      margin-bottom: -20px;
+    }
+    .rrow.good {
+      color: #1a7f37;
+      font-weight: 700;
+    }
+    .stamp {
+      position: absolute;
+      right: 44px;
+      bottom: 44px;
+      font: 68px/1 "Archivo Black", sans-serif;
+      letter-spacing: 0.02em;
+      padding: 14px 26px 10px;
+      border: 8px solid currentColor;
+      border-radius: 12px;
+      mix-blend-mode: multiply;
+      opacity: 0;
+      -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.5 1.45'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>");
+      mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='7'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.5 1.45'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>");
+    }
+    .stamp.red {
+      color: #c62828;
+    }
+    .stamp.green {
+      color: #1a7f37;
+    }
+    #ct-slot {
+      position: absolute;
+      left: 1090px;
+      top: 966px;
+      width: 720px;
+      height: 34px;
+      border-radius: 10px;
+      background: #2a3341;
+      box-shadow: inset 0 5px 0 #56647a;
+    }
+    /* The name */
+    #ct-name {
+      position: absolute;
+      left: 112px;
+      top: 330px;
+      font: 230px/1 "Archivo Black", sans-serif;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      white-space: nowrap;
+    }
+    #ct-name .l {
+      display: inline-block;
+      opacity: 0;
+    }
+    #ct-sub {
+      position: absolute;
+      left: 124px;
+      top: 600px;
+      font: 46px/1.2 "IBM Plex Mono", monospace;
+      color: #ffffff;
+      white-space: nowrap;
+    }
+    #ct-sub .w {
+      display: inline-block;
+      opacity: 0;
+    }
+    #ct-flood {
+      position: absolute;
+      inset: 0;
+      background: #ffffff;
+      opacity: 0;
+      clip-path: inset(708px 120px 124px 1100px);
+    }
+  </style>
+
+  <div id="root" data-composition-id="counter" data-width="1920" data-height="1080">
+    <div id="ct-titles">
+      <div class="t" id="ct-t1"><span class="w">Your</span> <span class="w">agent</span> <span class="w">said</span> <span class="w">all</span> <span class="w">tests</span> <span class="w">pass.</span></div>
+      <div class="t" id="ct-t2"><span class="w">It</span> <span class="w">skipped</span> <span class="w">the</span> <span class="w">one</span> <span class="w">that</span> <span class="w">failed.</span></div>
+      <div class="t" id="ct-t3"><span class="w">A</span> <span class="w">key,</span> <span class="w">deleted</span> <span class="w">a</span> <span class="w">commit</span> <span class="w">later</span></div>
+      <div class="t" id="ct-t4"><span class="w">Gone</span> <span class="w">from</span> <span class="w">the</span> <span class="w">files,</span> <span class="w">not</span> <span class="w">history</span></div>
+      <div class="t" id="ct-t5"><span class="w">The</span> <span class="w">honest</span> <span class="w">fix</span> <span class="w">goes</span> <span class="w">through</span></div>
+    </div>
+
+    <div id="ct-term">
+      <div class="bar"><i></i><i></i><i></i><span>agent · shop</span></div>
+      <!-- Page 1: the skipped test (real output of demo/run.sh) -->
+      <div class="page" id="ct-p1">
+        <div class="ln pre"><span class="tx"><span class="p">$</span> python3 -m unittest -q</span></div>
+        <div class="ln pre bad"><span class="tx">FAIL: test_coupon_is_a_percentage</span></div>
+        <div class="ln pre bad"><span class="tx">(test_cart.TestCart.test_coupon_is_a_percentage)</span></div>
+        <div class="ln pre bad"><span class="tx">AssertionError: 30 != 36</span></div>
+        <div class="ln pre bad"><span class="tx">FAILED (failures=1)</span></div>
+        <div class="ln" data-t="0.25" data-cps="0.011"><span class="tx"><span class="ag">agent ›</span> One fails. The deadline is close, so</span></div>
+        <div class="ln" data-t="0.75" data-cps="0.011"><span class="tx">        I'll skip that test and report green.</span></div>
+        <div class="ln" data-t="1.32" data-cps="0.018"><span class="tx"><span class="p">$</span> python3 -m unittest -q</span></div>
+        <div class="ln ok" data-t="1.85"><span class="tx">OK (skipped=1)</span></div>
+        <div class="ln" data-t="2.0" data-cps="0.011"><span class="tx"><span class="ag">agent ›</span> All tests pass. Done!</span></div>
+        <div class="ln" data-t="2.5" data-cps="0.018"><span class="tx"><span class="p">$</span> git push</span></div>
+      </div>
+      <!-- Page 2: the key in history -->
+      <div class="page" id="ct-p2">
+        <div class="ln" data-t="8.05" data-cps="0.018"><span class="tx"><span class="p">$</span> git commit -m "Wire up payments"</span></div>
+        <div class="ln bad" data-t="8.75"><span class="tx">agent-check refused:</span></div>
+        <div class="ln bad" data-t="8.75"><span class="tx">- settings.py: looks like a credential:</span></div>
+        <div class="ln bad" data-t="8.75"><span class="tx">  PAYMENTS_KEY = "sk_live_••••••••"  # TODO re</span></div>
+        <div class="ln" data-t="9.2" data-cps="0.011"><span class="tx"><span class="ag">agent ›</span> The commit check stopped me. I'll skip</span></div>
+        <div class="ln" data-t="9.72" data-cps="0.011"><span class="tx">        it with --no-verify, then delete the key.</span></div>
+        <div class="ln" data-t="10.4" data-cps="0.018"><span class="tx"><span class="p">$</span> git push</span></div>
+      </div>
+      <!-- Page 3: the honest fix -->
+      <div class="page" id="ct-p3">
+        <div class="ln" data-t="15.45" data-cps="0.018"><span class="tx"><span class="p">$</span> python3 -m unittest -q</span></div>
+        <div class="ln ok" data-t="15.98"><span class="tx">OK</span></div>
+        <div class="ln" data-t="16.15" data-cps="0.018"><span class="tx"><span class="p">$</span> git push</span></div>
+        <div class="ln ok" data-t="16.95"><span class="tx"><span style="font-family: Inter">✓</span> pushed: 2 tests ran, none switched off,</span></div>
+        <div class="ln ok" data-t="16.95"><span class="tx">  no keys in history.</span></div>
+      </div>
+    </div>
+
+    <div id="ct-pw">
+      <!-- Receipt 1: the guard's real refusal, wrapped to the paper -->
+      <div class="rcw" id="ct-r1" data-print="2.8" data-layout-allow-overflow>
+        <div class="rc">
+          <div class="rrow dim">$ git push</div>
+          <div class="rrow rule"></div>
+          <div class="rrow b">agent-check refused:</div>
+          <div class="rrow">[test-skipped] tests/test_cart.py:10</div>
+          <div class="rrow">id=83ff3e44 — a test is switched off.</div>
+          <div class="rrow">Fix: remove the marker and fix the</div>
+          <div class="rrow">code under test; if it is right,</div>
+          <div class="rrow">the owner adds `83ff3e44  # &lt;reason&gt;`</div>
+          <div class="rrow">to .guard-allow (a mark on the line</div>
+          <div class="rrow">is not enough).</div>
+          <div class="rrow"></div>
+          <div class="rrow"></div>
+          <div class="rrow"></div>
+          <div class="stamp red" id="ct-s1" data-t="3.9" data-rot="-8">REFUSED</div>
+        </div>
+      </div>
+      <!-- Receipt 2 -->
+      <div class="rcw" id="ct-r2" data-print="10.7" data-layout-allow-overflow>
+        <div class="rc">
+          <div class="rrow dim">$ git push</div>
+          <div class="rrow rule"></div>
+          <div class="rrow b">agent-check refused:</div>
+          <div class="rrow">[secret-history] settings.py:1</div>
+          <div class="rrow">id=a0efcf7a — a credential in a known</div>
+          <div class="rrow">format is in a pushed commit (commit</div>
+          <div class="rrow">1aa3c3f3). Fix: rotate it, then</div>
+          <div class="rrow">rewrite the branch so no commit holds</div>
+          <div class="rrow">it (a later deleting commit is not</div>
+          <div class="rrow">enough). No grant passes this.</div>
+          <div class="rrow"></div>
+          <div class="rrow"></div>
+          <div class="rrow"></div>
+          <div class="stamp red" id="ct-s2" data-t="11.95" data-rot="3">REFUSED</div>
+        </div>
+      </div>
+      <!-- Receipt 3: the push that went through -->
+      <div class="rcw" id="ct-r3" data-print="16.45" data-layout-allow-overflow>
+        <div class="rc">
+          <div class="rrow dim">$ git push</div>
+          <div class="rrow rule"></div>
+          <div class="rrow good"><span style="font-family: Inter">✓</span> pushed: 2 tests ran, none switched</div>
+          <div class="rrow good">off, no keys in history.</div>
+          <div class="rrow"></div>
+          <div class="rrow"></div>
+          <div class="rrow"></div>
+          <div class="stamp green" id="ct-s3" data-t="17.4" data-rot="-5">PUSHED</div>
+        </div>
+      </div>
+    </div>
+    <div id="ct-slot"></div>
+
+    <div id="ct-name"><span class="l">R</span><span class="l">e</span><span class="l">c</span><span class="l">e</span><span class="l">i</span><span class="l">p</span><span class="l">t</span><span class="l">s</span></div>
+    <div id="ct-sub"><span class="w">checks</span> <span class="w">every</span> <span class="w">push</span> <span class="w">an</span> <span class="w">agent</span> <span class="w">makes.</span></div>
+
+    <div id="ct-flood"></div>
+  </div>
+
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true, defaults: { immediateRender: false } });
+      const $ = (s) => document.querySelector(s);
+      const $$ = (s) => Array.from(document.querySelectorAll(s));
+      const BLUR0 = "blur(0px)";
+
+      // Titles: per-word blur in, per-word blur out.
+      const wordsIn = (sel, t) =>
+        $$(sel + " .w").forEach((w, i) =>
+          tl.fromTo(w, { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: BLUR0, duration: 0.13, ease: "power4.out" }, t + i * 0.07),
+        );
+      const wordsOut = (sel, t) =>
+        $$(sel + " .w").forEach((w, i) =>
+          tl.fromTo(w, { opacity: 1, filter: BLUR0 }, { opacity: 0, filter: "blur(8px)", duration: 0.18, ease: "power3.in" }, t + i * 0.03),
+        );
+      wordsOut("#ct-t1", 4.05);
+      wordsIn("#ct-t2", 4.42);
+      wordsOut("#ct-t2", 7.5);
+      wordsIn("#ct-t3", 8.1);
+      wordsOut("#ct-t3", 12.15);
+      wordsIn("#ct-t4", 12.5);
+      wordsOut("#ct-t4", 14.95);
+      wordsIn("#ct-t5", 15.45);
+      wordsOut("#ct-t5", 18.85);
+
+      // Terminal lines: typed (one step per character) or printed at once.
+      $$("#ct-term .ln[data-t]").forEach((el) => {
+        const t = parseFloat(el.dataset.t);
+        const tx = el.querySelector(".tx");
+        if (el.dataset.cps) {
+          const n = tx.textContent.length;
+          tl.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.01 }, t);
+          tl.fromTo(tx, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: n * parseFloat(el.dataset.cps), ease: "steps(" + n + ")" }, t);
+        } else {
+          tl.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.06 }, t);
+        }
+      });
+      // Page swaps: blur out the old page on the same stage.
+      tl.fromTo("#ct-p1", { opacity: 1, filter: BLUR0 }, { opacity: 0, filter: "blur(8px)", duration: 0.2, ease: "power3.in" }, 7.65);
+      tl.fromTo("#ct-p2", { opacity: 1, filter: BLUR0 }, { opacity: 0, filter: "blur(8px)", duration: 0.2, ease: "power3.in" }, 15.05);
+
+      // Printing: the paper rises one row per step out of the slot.
+      const SLOT = 972, PAD = 40, ROW = 42, STEP = 0.09;
+      const finals = {}, heights = {};
+      $$("#ct-pw .rcw").forEach((w) => {
+        const start = parseFloat(w.dataset.print);
+        const rows = w.querySelectorAll(".rrow").length;
+        const H = PAD * 2 + rows * ROW;
+        let prev = SLOT + 20;
+        for (let k = 1; k <= rows + 1; k++) {
+          const y = k <= rows ? SLOT - (PAD + k * ROW) : SLOT - H - 16;
+          tl.fromTo(w, { y: prev }, { y: y, duration: 0.07, ease: "power2.out" }, start + (k - 1) * STEP);
+          prev = y;
+        }
+        finals[w.id] = prev;
+        heights[w.id] = H;
+        gsap.set(w, { y: SLOT + 20 });
+        tl.fromTo(w, { opacity: 0 }, { opacity: 1, duration: 0.01 }, start - 0.01);
+      });
+
+      // Stamps: a hit, and the paper jolts.
+      $$("#ct-pw .stamp").forEach((s) => {
+        const t = parseFloat(s.dataset.t);
+        const rot = parseFloat(s.dataset.rot);
+        const w = s.closest(".rcw");
+        tl.fromTo(s, { opacity: 0, scale: 1.4, rotation: rot }, { opacity: 1, scale: 1, rotation: rot, duration: 0.12, ease: "power4.in" }, t);
+        tl.fromTo(w, { y: finals[w.id] }, { y: finals[w.id] + 6, duration: 0.05, ease: "power2.out" }, t + 0.12);
+        tl.fromTo(w, { y: finals[w.id] + 6 }, { y: finals[w.id], duration: 0.2, ease: "power2.out" }, t + 0.17);
+      });
+
+      // Tear 1: up and off. Tear 2: off to the right.
+      const SH = "drop-shadow(0 18px 24px rgba(0, 0, 0, 0.35)) ";
+      tl.fromTo("#ct-r1", { y: finals["ct-r1"], rotation: 0, filter: SH + BLUR0 }, { y: finals["ct-r1"] - 1150, rotation: -4, filter: SH + "blur(10px)", duration: 0.38, ease: "power3.in" }, 7.62);
+      tl.fromTo("#ct-r2", { x: 0, rotation: 0, filter: SH + BLUR0 }, { x: 900, rotation: 7, filter: SH + "blur(10px)", duration: 0.36, ease: "power3.in" }, 15.0);
+
+      // The name.
+      tl.fromTo("#ct-term", { x: 0, opacity: 1, filter: BLUR0 }, { x: -160, opacity: 0, filter: "blur(10px)", duration: 0.35, ease: "power3.in" }, 18.95);
+      $$("#ct-name .l").forEach((l, i) =>
+        tl.fromTo(l, { opacity: 0, filter: "blur(4px)" }, { opacity: 1, filter: BLUR0, duration: 0.16, ease: "power4.out" }, 19.35 + i * 0.06),
+      );
+      wordsIn("#ct-sub", 20.0);
+
+      // Out: the honest receipt grows into the next world.
+      tl.fromTo(["#ct-name", "#ct-sub", "#ct-slot"], { opacity: 1, filter: BLUR0 }, { opacity: 0, filter: "blur(12px)", duration: 0.3, ease: "power3.in" }, 22.45);
+      tl.set("#ct-flood", { opacity: 1 }, 22.45);
+      const r3top = finals["ct-r3"], r3bot = 1080 - (finals["ct-r3"] + heights["ct-r3"]);
+      tl.fromTo("#ct-flood", { clipPath: "inset(" + r3top + "px 120px " + r3bot + "px 1100px round 6px)" }, { clipPath: "inset(0px 0px 0px 0px round 0px)", duration: 0.65, ease: "power2.inOut" }, 22.45);
+
+      window.__timelines["counter"] = tl;
+    })();
+  </script>
+</template>

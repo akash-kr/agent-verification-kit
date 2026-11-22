@@ -1,0 +1,49 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+    }
+    #ec-mark {
+      position: absolute;
+      left: 150px;
+      top: 300px;
+      width: 768px;
+      height: 204px;
+      clip-path: inset(0 0 100% 0);
+    }
+    #ec-url {
+      position: absolute;
+      left: 160px;
+      top: 590px;
+      font: 700 48px/1.2 "IBM Plex Mono", monospace;
+      color: #ffffff;
+      opacity: 0;
+      white-space: nowrap;
+    }
+    #ec-run {
+      position: absolute;
+      left: 160px;
+      top: 672px;
+      font: 38px/1.2 "IBM Plex Mono", monospace;
+      color: rgba(255, 255, 255, 0.72);
+      opacity: 0;
+      white-space: nowrap;
+    }
+  </style>
+  <div id="root" data-composition-id="endcard" data-width="1920" data-height="1080">
+    <img id="ec-mark" src="assets/logo-dark.svg" alt="Receipts" />
+    <div id="ec-url">github.com/akash-kr/receipts</div>
+    <div id="ec-run">$ demo/run.sh</div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true, defaults: { immediateRender: false } });
+      // The mark prints like a receipt: one pixel row at a time, top to bottom.
+      tl.fromTo("#ec-mark", { clipPath: "inset(0% 0% 100% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.75, ease: "steps(17)" }, 0.4);
+      tl.fromTo("#ec-url", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 1.4);
+      tl.fromTo("#ec-run", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.2, ease: "power4.out" }, 1.75);
+      window.__timelines["endcard"] = tl;
+    })();
+  </script>
+</template>

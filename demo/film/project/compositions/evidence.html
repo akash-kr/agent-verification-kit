@@ -1,0 +1,307 @@
+<template>
+  <style>
+    #root {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      font-family: "IBM Plex Mono", monospace;
+      color: #1c1b19;
+    }
+    #ev-roll {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 2100px;
+    }
+    .slip {
+      position: relative;
+      width: 2100px;
+      padding: 70px 290px 170px;
+      margin-bottom: 64px;
+      background: #ffffff;
+      -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 40px 51% repeat-x,
+        conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / 40px 51% repeat-x;
+      mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 40px 51% repeat-x,
+        conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) top / 40px 51% repeat-x;
+    }
+    #ev-s0 {
+      height: 1180px;
+    }
+    #ev-chapter {
+      position: absolute;
+      left: 290px;
+      top: 452px;
+      font: 92px/1 "Archivo Black", sans-serif;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+    #ev-chapter .w {
+      display: inline-block;
+      opacity: 0;
+    }
+    .r {
+      opacity: 0;
+      white-space: pre;
+    }
+    .h {
+      height: 96px;
+      font: 64px/96px "Archivo Black", sans-serif;
+    }
+    .m {
+      height: 50px;
+      font-size: 30px;
+      line-height: 50px;
+    }
+    .dim {
+      color: #5c5f66;
+    }
+    .sp {
+      height: 22px;
+    }
+    .cmp {
+      height: 84px;
+      display: flex;
+      align-items: center;
+    }
+    .cmp .lab {
+      width: 440px;
+      font-size: 30px;
+      color: #5c5f66;
+    }
+    .cmp .val {
+      width: 640px;
+      font-size: 52px;
+      font-weight: 700;
+    }
+    .cmp .ver {
+      font-size: 32px;
+      font-weight: 700;
+    }
+    .big {
+      height: 84px;
+      font-size: 52px;
+      line-height: 84px;
+      font-weight: 700;
+    }
+    .red {
+      color: #c62828;
+    }
+    .green {
+      color: #1a7f37;
+    }
+    .close {
+      height: 62px;
+      font-size: 32px;
+      line-height: 62px;
+      font-weight: 700;
+      color: #1a7f37;
+    }
+    .tick {
+      font-family: Inter, sans-serif;
+    }
+    .media {
+      position: relative;
+      height: 600px;
+    }
+    .media .shot {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 960px;
+      height: 600px;
+      border: 2px solid #dde1e6;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #f6f7f9;
+    }
+    .media .shot img,
+    .media .shot video {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 956px;
+      height: 596px;
+    }
+    #ev-last {
+      opacity: 0;
+    }
+    #ev-phone {
+      position: absolute;
+      left: 1010px;
+      top: 0;
+      width: 277px;
+      height: 600px;
+      border: 2px solid #dde1e6;
+      border-radius: 18px;
+      opacity: 0;
+    }
+    .pf {
+      height: 54px;
+      font-size: 30px;
+      line-height: 54px;
+      position: relative;
+    }
+    .pf .ann {
+      position: absolute;
+      left: 900px;
+      top: 0;
+      color: #5c5f66;
+      font-family: Inter, sans-serif;
+      font-size: 30px;
+    }
+    .stamp {
+      position: absolute;
+      left: 1380px;
+      top: 0;
+      font: 72px/1 "Archivo Black", sans-serif;
+      letter-spacing: 0.02em;
+      padding: 14px 24px 10px;
+      border: 8px solid currentColor;
+      border-radius: 12px;
+      color: #1a7f37;
+      mix-blend-mode: multiply;
+      opacity: 0;
+      -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='11'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.5 1.45'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>");
+      mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='11'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.5 1.45'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>");
+    }
+  </style>
+
+  <div id="root" data-composition-id="evidence" data-width="1920" data-height="1080">
+    <div id="ev-roll" data-layout-allow-overflow>
+      <!-- The honest receipt, grown to fill the frame -->
+      <div class="slip" id="ev-s0">
+        <div id="ev-chapter"><span class="w">It</span> <span class="w">has</span> <span class="w">to</span> <span class="w">show</span> <span class="w">evidence</span></div>
+      </div>
+
+      <!-- 1. Before and after: examples/api-bug-fix.sh -->
+      <div class="slip" id="ev-s1">
+        <div class="r h" data-t="2.6">Before and after</div>
+        <div class="r m dim" data-t="3.0">The bug report: "A 10% coupon on a $40 cart charges $30. It should be $36."</div>
+        <div class="sp"></div>
+        <div class="r m" data-t="3.6">$ curl -s -i "$EVIDENCE_URL/total?prices=20,20&amp;coupon=10"</div>
+        <div class="sp"></div>
+        <div class="r cmp" data-t="4.2"><span class="lab">Before (old code)</span><span class="val">{"total": 30.0}</span><span class="ver red">does not</span></div>
+        <div class="r cmp" data-t="4.9"><span class="lab">After (this commit)</span><span class="val">{"total": 36.0}</span><span class="ver green">meets it</span></div>
+        <div class="sp"></div>
+        <div class="r close" data-t="5.8" data-stamp="ev-st1"><span class="tick">✓</span> pushed with its evidence page.</div>
+        <div class="r m dim" data-t="6.0">commit c76a01b97c</div>
+        <div class="stamp" id="ev-st1" data-t="6.3" data-rot="-6" data-layout-allow-occlusion>PUSHED</div>
+      </div>
+
+      <!-- 2. Screenshots and video: examples/ui-change.sh -->
+      <div class="slip" id="ev-s2">
+        <div class="r h" data-t="7.6">Screenshots and video</div>
+        <div class="r m dim" data-t="8.0">The task: "Add a coupon box to the cart page."</div>
+        <div class="sp"></div>
+        <div class="r media" data-t="8.5" data-anchor="200">
+          <div class="shot">
+            <img src="assets/flow-first.png" alt="" />
+            <video id="ev-flow" class="clip" data-start="9.0" data-duration="4.1" data-track-index="1" src="assets/flow.mp4" muted playsinline></video>
+            <img id="ev-last" src="assets/flow-last.png" alt="" />
+          </div>
+          <img id="ev-phone" src="assets/phone.png" alt="" />
+        </div>
+        <div class="sp"></div>
+        <div class="r m" data-t="13.5">requests: 3   failed: 0   page errors: 0</div>
+        <div class="sp"></div>
+        <div class="r close" data-t="14.0" data-stamp="ev-st2"><span class="tick">✓</span> pushed with screenshots and a recording of the real page.</div>
+        <div class="r m dim" data-t="14.15">commit d24c9924bd</div>
+        <div class="stamp" id="ev-st2" data-t="14.45" data-rot="4" data-layout-allow-occlusion>PUSHED</div>
+      </div>
+
+      <!-- 3. A test that fails first: examples/bug-test.sh -->
+      <div class="slip" id="ev-s3">
+        <div class="r h" data-t="15.5">A test that fails first</div>
+        <div class="r m dim" data-t="15.9">LAWS.md  B1: "A 10% coupon takes 10% off the total, not 10 dollars."</div>
+        <div class="sp"></div>
+        <div class="r m" data-t="16.4">$ python3 run_tests.py tests/test_cart.py test_coupon   # on the old code (9f99a4b6)</div>
+        <div class="r m" data-t="16.75">FAIL tests/test_cart.py::test_coupon: assert total([20, 20], coupon=10) == 36</div>
+        <div class="r big red" data-t="17.1">0 passed, 1 failed</div>
+        <div class="sp"></div>
+        <div class="r m" data-t="17.8">$ python3 run_tests.py   # on this commit (7d1e36c8)</div>
+        <div class="r big green" data-t="18.2">2 passed, 0 failed</div>
+        <div class="sp"></div>
+        <div class="r close" data-t="18.9" data-stamp="ev-st3"><span class="tick">✓</span> pushed: the test names B1, fails on the old code and passes on the new.</div>
+        <div class="stamp" id="ev-st3" data-t="19.3" data-rot="-3" data-layout-allow-occlusion>PUSHED</div>
+      </div>
+
+      <!-- 4. Proof for this commit: examples/stale-proof.sh -->
+      <div class="slip" id="ev-s4">
+        <div class="r h" data-t="20.3">Proof for this commit</div>
+        <div class="r m dim" data-t="20.5">The task: "Show how many items are in the cart."</div>
+        <div class="sp"></div>
+        <div class="r m" data-t="21.0">$ cat .test-tmp/verify/passed      # the proof the push reads</div>
+        <div class="r pf" data-t="21.3">4ed8721a09e3400a8a78a2c27ce30eb878d33278<span class="ann">← the commit</span></div>
+        <div class="r pf" data-t="21.8">clean<span class="ann">← nothing uncommitted</span></div>
+        <div class="r pf" data-t="22.2">8382691dddce712dff082e95190d9bce09373401d52dfc0fc6c748ddd7d9e5a4</div>
+        <div class="r pf" data-t="22.4">  shop/.test-tmp/verify/steps.log<span class="ann">← a hash of each file the check wrote</span></div>
+        <div class="sp"></div>
+        <div class="r close" data-t="23.2" data-stamp="ev-st4"><span class="tick">✓</span> pushed, with proof from a passing check on this exact commit.</div>
+        <div class="stamp" id="ev-st4" data-t="23.9" data-rot="5" data-layout-allow-occlusion>PUSHED</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true, defaults: { immediateRender: false } });
+      const $ = (s) => document.querySelector(s);
+      const $$ = (s) => Array.from(document.querySelectorAll(s));
+      const roll = $("#ev-roll");
+      const BLUR0 = "blur(0px)";
+      const FOCUS = 860; // where the newest printed row's bottom sits
+      const topIn = (el) => {
+        let y = 0;
+        for (let n = el; n && n !== roll; n = n.offsetParent) y += n.offsetTop;
+        return y;
+      };
+
+      gsap.set(roll, { x: -90, y: 0, scale: 1, transformOrigin: "0 0" });
+
+      // The chapter line, word by word.
+      $$("#ev-chapter .w").forEach((w, i) =>
+        tl.fromTo(w, { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: BLUR0, duration: 0.13, ease: "power4.out" }, 0.2 + i * 0.07),
+      );
+
+      // Stamps sit beside the closing line of their slip.
+      $$("#ev-roll .close[data-stamp]").forEach((c) => {
+        document.getElementById(c.dataset.stamp).style.top = c.offsetTop + 70 + "px";
+      });
+
+      // Rows print in order; the camera keeps the newest row in view and only moves up the paper.
+      const rows = $$("#ev-roll .r[data-t]").sort((a, b) => a.dataset.t - b.dataset.t);
+      let y = 0;
+      rows.forEach((row, i) => {
+        const t = parseFloat(row.dataset.t);
+        const top = topIn(row);
+        const target = row.dataset.anchor ? parseFloat(row.dataset.anchor) - top : FOCUS - (top + row.offsetHeight);
+        tl.fromTo(row, { opacity: 0 }, { opacity: 1, duration: 0.08 }, t);
+        if (target < y) {
+          const next = rows[i + 1] ? parseFloat(rows[i + 1].dataset.t) : t + 1;
+          tl.fromTo(roll, { y: y }, { y: target, duration: Math.min(0.45, next - t - 0.02), ease: "power2.inOut" }, t);
+          y = target;
+        }
+      });
+
+      // The recording: first frame before it plays, last frame after.
+      tl.fromTo("#ev-last", { opacity: 0 }, { opacity: 1, duration: 0.01 }, 13.08);
+      tl.fromTo("#ev-phone", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: BLUR0, duration: 0.2, ease: "power4.out" }, 13.0);
+
+      // Stamps.
+      $$("#ev-roll .stamp").forEach((s) => {
+        const t = parseFloat(s.dataset.t), rot = parseFloat(s.dataset.rot);
+        tl.fromTo(s, { opacity: 0, scale: 1.4, rotation: rot }, { opacity: 1, scale: 1, rotation: rot, duration: 0.12, ease: "power4.in" }, t);
+      });
+
+      // Pull back: the whole roll of receipts, cobalt around it.
+      const top1 = topIn($("#ev-s1")) - 20;
+      const s4 = $("#ev-s4");
+      const bot = topIn(s4) + s4.offsetHeight + 20;
+      const sc = 980 / (bot - top1);
+      tl.fromTo("#ev-s0", { opacity: 1 }, { opacity: 0, duration: 0.3 }, 26.1);
+      tl.fromTo(roll, { x: -90, y: y, scale: 1 }, { x: 1440 - 1050 * sc, y: 50 - top1 * sc, scale: sc, duration: 1.4, ease: "power2.inOut" }, 26.1);
+
+      window.__timelines["evidence"] = tl;
+    })();
+  </script>
+</template>
